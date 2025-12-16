@@ -52,14 +52,10 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   const [specificChartData, setSpecificChartData] = useState<any[]>([])
   const [isPending, startTransition] = useTransition()
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  
-  // Estado para o Widget de Fatura Aberta
   const [selectedCcCategory, setSelectedCcCategory] = useState<string | null>(null)
 
   const currentBalance = data.totalIncome - data.currentMonthTotal
   const isSpendingMore = data.percentageChange > 0
-
-  // Limite de crédito
   const activeCreditLimit = data.totalCreditLimit > 0 ? data.totalCreditLimit : 0;
   
   useEffect(() => {
@@ -75,36 +71,25 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     router.push(`/dashboard?month=${month}&year=${year}`)
   }
 
-  // --- LÓGICA DO WIDGET DE FATURA ---
-
-  // 1. Filtrar transações da categoria selecionada para a lista direita
+  // Lógica Widget Fatura
   const getGroupedTransactions = (category: string) => {
     const rawList = data.ccTransactions.filter(t => t.category === category)
     return rawList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }
 
-  // 2. Gerar dados para o gráfico de evolução diária (Lado Esquerdo - Estado Focus)
   const categoryDailyEvolution = useMemo(() => {
     if (!selectedCcCategory) return []
-    
     const transactions = data.ccTransactions.filter(t => t.category === selectedCcCategory)
     const daysMap = new Map<number, number>()
-    
-    // Inicializa dias com transações
     transactions.forEach(t => {
       const day = new Date(t.created_at).getDate()
       daysMap.set(day, (daysMap.get(day) || 0) + t.amount)
     })
-
-    // Cria array ordenado
-    const chartData = Array.from(daysMap.entries())
+    return Array.from(daysMap.entries())
       .map(([day, value]) => ({ day: `Dia ${day}`, value }))
       .sort((a, b) => parseInt(a.day.split(' ')[1]) - parseInt(b.day.split(' ')[1]))
-
-    return chartData
   }, [selectedCcCategory, data.ccTransactions])
 
-  // Cálculos de Projeção
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate()
   const today = new Date()
   const isCurrentMonth = today.getMonth() === selectedMonth && today.getFullYear() === selectedYear
@@ -112,31 +97,26 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   const dailyAvg = data.ccTotal / (dayCount || 1)
   const projection = isCurrentMonth ? dailyAvg * daysInMonth : data.ccTotal
 
-  // Cálculos visuais da barra de limite
   const limitUsedPercent = activeCreditLimit > 0 ? (data.ccTotal / activeCreditLimit) * 100 : 0
   const limitAvailable = activeCreditLimit - data.ccTotal
   let limitBarColor = 'bg-indigo-500'
   if (limitUsedPercent > 100) limitBarColor = 'bg-red-500'
   else if (limitUsedPercent > 80) limitBarColor = 'bg-yellow-500'
 
-  // Insight Dinâmico
   const dynamicInsightText = useMemo(() => {
     if (selectedCcCategory) {
        const catVal = data.ccCategoryData.find(c => c.name === selectedCcCategory)?.value || 0
        const percent = data.ccTotal > 0 ? ((catVal / data.ccTotal) * 100).toFixed(1) : '0'
        return `Você gastou ${formatCurrency(catVal)} em ${selectedCcCategory}. Isso representa ${percent}% da sua fatura.`
     }
-    
-    if (projection > activeCreditLimit && activeCreditLimit > 0) return `Atenção: A projeção (${formatCurrency(projection)}) indica risco de estourar seu limite de ${formatCurrency(activeCreditLimit)}.`
-    if (isCurrentMonth && projection > data.ccTotal * 1.2) return `Cuidado: O ritmo de gastos diários (${formatCurrency(dailyAvg)}) está alto para o início do mês.`
-    
-    return "Seus gastos parecem controlados. Nenhuma anomalia crítica detectada nesta fatura."
+    if (projection > activeCreditLimit && activeCreditLimit > 0) return `Atenção: Projeção de ${formatCurrency(projection)} pode estourar limite.`
+    if (isCurrentMonth && projection > data.ccTotal * 1.2) return `Cuidado: Gastos diários (${formatCurrency(dailyAvg)}) acima da média.`
+    return "Gastos controlados. Nenhuma anomalia crítica."
   }, [selectedCcCategory, projection, dailyAvg, data.ccTotal, data.ccCategoryData, activeCreditLimit, isCurrentMonth])
 
-  // Score Colors
-  let scoreTextColor = 'text-red-400', scoreLabel = 'Crítico', scoreDesc = 'Seus gastos estão excedendo sua renda.'
-  if (data.healthScore >= 80) { scoreTextColor = 'text-indigo-400'; scoreLabel = 'Excelente'; scoreDesc = 'Parabéns! Você está poupando muito.' }
-  else if (data.healthScore >= 50) { scoreTextColor = 'text-yellow-400'; scoreLabel = 'Atenção'; scoreDesc = 'Você está no limite.' }
+  let scoreTextColor = 'text-red-400', scoreLabel = 'Crítico', scoreDesc = 'Gastos excedendo renda.'
+  if (data.healthScore >= 80) { scoreTextColor = 'text-indigo-400'; scoreLabel = 'Excelente'; scoreDesc = 'Parabéns! Poupando muito.' }
+  else if (data.healthScore >= 50) { scoreTextColor = 'text-yellow-400'; scoreLabel = 'Atenção'; scoreDesc = 'No limite.' }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -149,7 +129,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
             <p className="text-zinc-400 text-sm">Olá, <strong className="text-zinc-200">{userProfile.name}</strong></p>
             <span className="hidden sm:block text-zinc-600">•</span>
             <div className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400/90 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/10">
-               <Lightbulb size={10} strokeWidth={3}/> {currentBalance < 0 ? 'Você gastou mais do que recebeu.' : 'Balanço positivo.'}
+               <Lightbulb size={10} strokeWidth={3}/> {currentBalance < 0 ? 'Déficit mensal.' : 'Balanço positivo.'}
             </div>
           </div>
         </div>
@@ -160,7 +140,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               <div className={`text-3xl font-bold ${scoreTextColor} leading-none flex items-center justify-end gap-2`}>
                   <Activity size={20} className="opacity-50" /> {data.healthScore}
               </div>
-              
               <div className="absolute top-full right-0 mt-3 w-64 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 pointer-events-none text-left">
                   <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-bold text-zinc-400 uppercase">Saúde Financeira</span>
@@ -192,21 +171,21 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
       {/* KPI CARDS */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className={cardClass}>
-          <div className="space-y-1"><p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Gastos do mês</p><h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(data.currentMonthTotal)}</h3></div>
+          <div className="space-y-1"><p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Gastos</p><h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(data.currentMonthTotal)}</h3></div>
           <div className={iconBadgeClass}><DollarSign size={18} strokeWidth={2} /></div>
           <div className="mt-auto pt-4 border-t border-white/5"><div className={`inline-flex items-center gap-1.5 text-xs font-medium ${isSpendingMore ? 'text-rose-400' : 'text-emerald-400'}`}>{isSpendingMore ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}{Math.abs(data.percentageChange).toFixed(1)}% <span className="text-zinc-500 font-normal">vs. mês anterior</span></div></div>
         </div>
         <div className={cardClass}>
-          <div className="space-y-1"><p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Saldo Restante</p><h3 className={`text-2xl font-bold tracking-tight ${currentBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(currentBalance)}</h3></div>
+          <div className="space-y-1"><p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Saldo</p><h3 className={`text-2xl font-bold tracking-tight ${currentBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(currentBalance)}</h3></div>
           <div className={iconBadgeClass}><Wallet size={18} strokeWidth={2} /></div>
-          <p className="text-[11px] text-zinc-500 mt-auto pt-4 border-t border-white/5 flex items-center gap-1">{currentBalance < 0 ? "Orçamento estourado" : "Dentro do orçamento"}</p>
+          <p className="text-[11px] text-zinc-500 mt-auto pt-4 border-t border-white/5 flex items-center gap-1">{currentBalance < 0 ? "Negativo" : "Positivo"}</p>
         </div>
         <div className={cardClass}>
           <div className="w-full space-y-1"><p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Maior despesa</p>{data.highestExpense ? (<><h3 className="text-sm font-semibold text-zinc-200 truncate" title={data.highestExpense.name}>{data.highestExpense.name}</h3><p className="text-xl font-bold text-zinc-100">{formatCurrency(data.highestExpense.value)}</p></>) : <span className="text-sm text-zinc-600">--</span>}</div>
           <div className={iconBadgeClass}><AlertTriangle size={18} strokeWidth={2} /></div>
         </div>
         <div className={cardClass}>
-          <div className="w-full space-y-1"><p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Próximo Vencimento</p>{data.nextDue ? (<><h3 className="text-sm font-semibold text-zinc-200 truncate" title={data.nextDue.name}>{data.nextDue.name}</h3><div className="flex items-baseline gap-2"><p className="text-xl font-bold text-indigo-400">{formatCurrency(data.nextDue.value)}</p></div><p className="text-[10px] text-zinc-500 mt-1">Dia {new Date(data.nextDue.date).getUTCDate()}</p></>) : <span className="text-xs font-bold text-emerald-500">Tudo pago!</span>}</div>
+          <div className="w-full space-y-1"><p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Vencimento</p>{data.nextDue ? (<><h3 className="text-sm font-semibold text-zinc-200 truncate" title={data.nextDue.name}>{data.nextDue.name}</h3><div className="flex items-baseline gap-2"><p className="text-xl font-bold text-indigo-400">{formatCurrency(data.nextDue.value)}</p></div><p className="text-[10px] text-zinc-500 mt-1">Dia {new Date(data.nextDue.date).getUTCDate()}</p></>) : <span className="text-xs font-bold text-emerald-500">Pago!</span>}</div>
           <div className={iconBadgeClass}><CalendarClock size={18} strokeWidth={2} /></div>
         </div>
       </div>
@@ -214,7 +193,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
       {/* GRÁFICO PRINCIPAL */}
       <div className="card h-[400px]">
           <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div><h3 className="text-base font-semibold text-white">Fluxo de Caixa</h3><p className="text-xs text-zinc-500">Receitas vs Despesas ({selectedYear})</p></div>
+              <div><h3 className="text-base font-semibold text-white">Fluxo de Caixa</h3><p className="text-xs text-zinc-500">Anual ({selectedYear})</p></div>
               <div className="bg-zinc-900 border border-white/5 p-0.5 rounded-lg flex">
                   {[{ key: 'all', label: 'Tudo' }, { key: 'income', label: 'Receitas' }, { key: 'expense', label: 'Despesas' }].map((filter) => (
                       <button key={filter.key} onClick={() => setChartFilter(filter.key)} className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all duration-200 ${chartFilter === filter.key ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}>{filter.label}</button>
@@ -284,77 +263,48 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           </div>
       </div>
 
-      {/* --- WIDGET FATURA ABERTA (ADAPTÁVEL) --- */}
-      {/* MUDANÇA: min-h-[450px] em vez de height fixo. 
-         A altura final será definida pelo conteúdo da lista de categorias (Overview).
-         O detalhe usará "absolute" para se sobrepor sem mudar o layout.
-      */}
+      {/* WIDGET FATURA ABERTA */}
       <div className="card rounded-2xl relative overflow-hidden flex flex-col md:flex-row min-h-[450px]">
-        {userProfile.plan === 'free' && <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center p-6"><div className="bg-zinc-800 p-3 rounded-full mb-3"><Lock className="text-yellow-400" size={20} /></div><h3 className="text-base font-bold text-white">Painel de Fatura Pro</h3><p className="text-xs text-zinc-400 mb-4 max-w-xs">Desbloqueie análises de projeção, impacto por categoria e micro-insights.</p><button onClick={() => setShowUpgradeModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">Desbloquear Premium</button></div>}
+        {userProfile.plan === 'free' && <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center p-6"><div className="bg-zinc-800 p-3 rounded-full mb-3"><Lock className="text-yellow-400" size={20} /></div><h3 className="text-base font-bold text-white">Painel de Fatura Pro</h3><p className="text-xs text-zinc-400 mb-4 max-w-xs">Desbloqueie análises de projeção e insights.</p><button onClick={() => setShowUpgradeModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">Desbloquear Premium</button></div>}
 
-        {/* LADO ESQUERDO: Gráfico e Insights */}
         <div className="w-full md:w-[40%] bg-zinc-900/30 border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col relative justify-between">
-           
-           {/* Header do Widget */}
            <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                  <span className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center"><PieChart size={14} /></span>
                  {selectedCcCategory ? `Foco: ${selectedCcCategory}` : 'Fatura Aberta'}
               </h3>
               <p className="text-[11px] text-zinc-500 mt-1 ml-10">
-                {selectedCcCategory ? 'Evolução diária' : 'Análise de impacto e projeção'}
+                {selectedCcCategory ? 'Evolução diária' : 'Análise de impacto'}
               </p>
            </div>
            
-           {/* BARRA DE LIMITE (Contexto Macro sempre visível) */}
            {activeCreditLimit > 0 && !selectedCcCategory && (
              <div className="mt-4 bg-zinc-950/50 p-3 rounded-xl border border-white/5 animate-in fade-in slide-in-from-top-2">
                <div className="flex justify-between items-end mb-2">
-                 <div>
-                   <span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Comprometido</span>
-                   <span className="text-xs font-bold text-white flex items-center gap-1">
-                      {limitUsedPercent.toFixed(1)}% <CreditCard size={10} className="text-zinc-600"/>
-                   </span>
-                 </div>
-                 <div className="text-right">
-                   <span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Disponível</span>
-                   <span className={`text-xs font-bold ${limitAvailable < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                     {formatCurrency(limitAvailable)}
-                   </span>
-                 </div>
+                 <div><span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Comprometido</span><span className="text-xs font-bold text-white flex items-center gap-1">{limitUsedPercent.toFixed(1)}% <CreditCard size={10} className="text-zinc-600"/></span></div>
+                 <div className="text-right"><span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Disponível</span><span className={`text-xs font-bold ${limitAvailable < 0 ? 'text-red-400' : 'text-emerald-400'}`}>{formatCurrency(limitAvailable)}</span></div>
                </div>
-               <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1.5">
-                 <div className={`h-full rounded-full transition-all duration-700 ease-out ${limitBarColor}`} style={{ width: `${Math.min(limitUsedPercent, 100)}%` }}></div>
-               </div>
-               <div className="text-right"><span className="text-[9px] text-zinc-600">Limite Total: {formatCurrency(activeCreditLimit)}</span></div>
+               <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1.5"><div className={`h-full rounded-full transition-all duration-700 ease-out ${limitBarColor}`} style={{ width: `${Math.min(limitUsedPercent, 100)}%` }}></div></div>
+               <div className="text-right"><span className="text-[9px] text-zinc-600">Total: {formatCurrency(activeCreditLimit)}</span></div>
              </div>
            )}
 
-           {/* ÁREA DO GRÁFICO (Troca dinâmica) */}
-           <div className="flex-1 min-h-[140px] w-full flex flex-col justify-center py-4">
+           {/* --- AQUI ESTÁ A CORREÇÃO DO ERRO DO GRÁFICO --- */}
+           <div className="w-full h-[180px] my-4">
              {selectedCcCategory ? (
-               // GRÁFICO DE FOCO (EVOLUÇÃO)
                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={categoryDailyEvolution} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorSplit" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={categoryColors[selectedCcCategory] || '#6366f1'} stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor={categoryColors[selectedCcCategory] || '#6366f1'} stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
+                    <defs><linearGradient id="colorSplit" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={categoryColors[selectedCcCategory] || '#6366f1'} stopOpacity={0.3}/><stop offset="95%" stopColor={categoryColors[selectedCcCategory] || '#6366f1'} stopOpacity={0}/></linearGradient></defs>
                     <Tooltip cursor={{stroke: '#ffffff20'}} contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '11px' }} />
                     <Area type="monotone" dataKey="value" stroke={categoryColors[selectedCcCategory] || '#6366f1'} fill="url(#colorSplit)" strokeWidth={2} />
-                    <XAxis dataKey="day" hide />
-                    <YAxis hide />
+                    <XAxis dataKey="day" hide /><YAxis hide />
                   </AreaChart>
                </ResponsiveContainer>
              ) : (
-               // GRÁFICO PADRÃO (DISTRIBUIÇÃO)
                data.ccCategoryData.length > 0 ? (
                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.ccCategoryData.slice(0, 5)} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
-                      <XAxis type="number" hide />
-                      <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#71717a', fontWeight: 600 }} width={70} tickLine={false} axisLine={false} />
+                      <XAxis type="number" hide /><YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#71717a', fontWeight: 600 }} width={70} tickLine={false} axisLine={false} />
                       <Tooltip cursor={{fill: '#ffffff05'}} contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '11px' }} />
                       <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
                         {data.ccCategoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={categoryColors[entry.name] || '#6366f1'} />)}
@@ -365,99 +315,50 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
              )}
            </div>
 
-           {/* INSIGHTS FOOTER */}
            <div className="mt-auto bg-zinc-800/20 border border-white/5 rounded-xl p-3 flex gap-3 items-start animate-in fade-in">
-              <div className={`p-1.5 rounded-md shrink-0 ${selectedCcCategory ? 'bg-indigo-500/20 text-indigo-400' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                 {selectedCcCategory ? <Zap size={14}/> : <AlertTriangle size={14}/>}
-              </div>
-              <div>
-                 <p className="text-[11px] text-zinc-300 leading-snug font-medium line-clamp-2">
-                    {dynamicInsightText}
-                 </p>
-              </div>
+              <div className={`p-1.5 rounded-md shrink-0 ${selectedCcCategory ? 'bg-indigo-500/20 text-indigo-400' : 'bg-yellow-500/10 text-yellow-500'}`}>{selectedCcCategory ? <Zap size={14}/> : <AlertTriangle size={14}/>}</div>
+              <div><p className="text-[11px] text-zinc-300 leading-snug font-medium line-clamp-2">{dynamicInsightText}</p></div>
            </div>
         </div>
 
-        {/* LADO DIREITO: Listas (Scroll Interno) */}
         <div className="flex-1 bg-zinc-950/20 relative flex flex-col h-full overflow-hidden">
-           {/* Header da Lista */}
            <div className="h-14 border-b border-white/5 flex items-center px-4 shrink-0 bg-zinc-900/10 backdrop-blur-sm z-20">
               {selectedCcCategory ? (
                  <div className="flex items-center gap-2 w-full animate-in slide-in-from-left-2">
-                    <button onClick={() => setSelectedCcCategory(null)} className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors">
-                       <ArrowLeft size={16}/>
-                    </button>
+                    <button onClick={() => setSelectedCcCategory(null)} className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors"><ArrowLeft size={16}/></button>
                     <span className="text-sm font-bold text-white truncate">{selectedCcCategory}</span>
-                    <span className="ml-auto text-xs font-bold text-zinc-500 bg-zinc-900 px-2 py-1 rounded border border-white/5 whitespace-nowrap">
-                       {data.ccCategoryData.find(c => c.name === selectedCcCategory)?.value 
-                         ? formatCurrency(data.ccCategoryData.find(c => c.name === selectedCcCategory)!.value) 
-                         : '-'}
-                    </span>
+                    <span className="ml-auto text-xs font-bold text-zinc-500 bg-zinc-900 px-2 py-1 rounded border border-white/5 whitespace-nowrap">{data.ccCategoryData.find(c => c.name === selectedCcCategory)?.value ? formatCurrency(data.ccCategoryData.find(c => c.name === selectedCcCategory)!.value) : '-'}</span>
                  </div>
               ) : (
-                 <div className="flex items-center justify-between w-full">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Detalhamento por Categoria</span>
-                    <span className="text-[10px] text-zinc-600 bg-zinc-900/50 px-2 py-1 rounded border border-white/5">
-                       {data.ccCategoryData.length} categorias
-                    </span>
-                 </div>
+                 <div className="flex items-center justify-between w-full"><span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Categorias</span><span className="text-[10px] text-zinc-600 bg-zinc-900/50 px-2 py-1 rounded border border-white/5">{data.ccCategoryData.length} categorias</span></div>
               )}
            </div>
 
-           {/* CONTAINER DAS LISTAS */}
            <div className="relative flex-1 p-2">
-              
-              {/* LISTA 1: CATEGORIAS (Define a altura do container, sempre renderizada) */}
               <div className={`space-y-1.5 pb-4 transition-opacity duration-200 ${selectedCcCategory ? 'invisible opacity-0 pointer-events-none' : 'visible opacity-100'}`}>
                     {data.ccCategoryData.map((cat) => (
-                       <button 
-                          key={cat.name}
-                          onClick={() => setSelectedCcCategory(cat.name)}
-                          className="w-full flex items-center justify-between p-3 bg-zinc-900/30 border border-transparent hover:border-white/5 hover:bg-zinc-800/50 rounded-xl transition-all group"
-                       >
+                       <button key={cat.name} onClick={() => setSelectedCcCategory(cat.name)} className="w-full flex items-center justify-between p-3 bg-zinc-900/30 border border-transparent hover:border-white/5 hover:bg-zinc-800/50 rounded-xl transition-all group">
                           <div className="flex items-center gap-3 overflow-hidden">
                              <div className="w-1.5 h-8 rounded-full shrink-0" style={{backgroundColor: categoryColors[cat.name] || '#71717a'}}></div>
-                             <div className="text-left overflow-hidden">
-                                <p className="text-xs font-bold text-zinc-300 group-hover:text-white transition-colors truncate">{cat.name}</p>
-                                <div className="flex items-center gap-1 mt-0.5">
-                                   <div className="w-16 h-1 bg-zinc-800 rounded-full overflow-hidden shrink-0">
-                                      <div className="h-full bg-zinc-500 group-hover:bg-indigo-500 transition-colors" style={{width: `${data.ccTotal > 0 ? ((cat.value / data.ccTotal) * 100) : 0}%`}}></div>
-                                   </div>
-                                   <span className="text-[9px] text-zinc-500">{data.ccTotal > 0 ? ((cat.value / data.ccTotal) * 100).toFixed(0) : 0}%</span>
-                                </div>
-                             </div>
+                             <div className="text-left overflow-hidden"><p className="text-xs font-bold text-zinc-300 group-hover:text-white transition-colors truncate">{cat.name}</p><div className="flex items-center gap-1 mt-0.5"><div className="w-16 h-1 bg-zinc-800 rounded-full overflow-hidden shrink-0"><div className="h-full bg-zinc-500 group-hover:bg-indigo-500 transition-colors" style={{width: `${data.ccTotal > 0 ? ((cat.value / data.ccTotal) * 100) : 0}%`}}></div></div><span className="text-[9px] text-zinc-500">{data.ccTotal > 0 ? ((cat.value / data.ccTotal) * 100).toFixed(0) : 0}%</span></div></div>
                           </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                             <span className="text-xs font-bold text-zinc-400 group-hover:text-white">{formatCurrency(cat.value)}</span>
-                             <ChevronRight size={14} className="text-zinc-700 group-hover:text-zinc-400"/>
-                          </div>
+                          <div className="flex items-center gap-3 shrink-0"><span className="text-xs font-bold text-zinc-400 group-hover:text-white">{formatCurrency(cat.value)}</span><ChevronRight size={14} className="text-zinc-700 group-hover:text-zinc-400"/></div>
                        </button>
                     ))}
-                    {data.ccCategoryData.length === 0 && (
-                       <div className="text-center py-10 text-zinc-600 text-xs">Nenhum gasto no cartão.</div>
-                    )}
+                    {data.ccCategoryData.length === 0 && (<div className="text-center py-10 text-zinc-600 text-xs">Nenhum gasto.</div>)}
               </div>
 
-              {/* LISTA 2: DETALHES (Overlay Absoluto com Scroll) */}
               {selectedCcCategory && (
                  <div className="absolute inset-0 p-2 overflow-y-auto custom-scrollbar z-10 animate-in fade-in zoom-in-95 duration-300">
                     <div className="space-y-1 pb-4">
                         {getGroupedTransactions(selectedCcCategory).map((t, i) => (
                            <div key={i} className="flex items-center justify-between p-3 bg-zinc-900/60 backdrop-blur-md border border-white/10 rounded-xl hover:bg-zinc-800/80 transition-colors shadow-sm">
-                              <div className="flex flex-col gap-0.5 max-w-[70%]">
-                                 <span className="text-xs font-medium text-zinc-200 truncate">{t.description}</span>
-                                 <span className="text-[10px] text-zinc-500">{formatDate(t.created_at)}</span>
-                              </div>
-                              <span className="text-xs font-bold text-white whitespace-nowrap">{formatCurrency(t.amount)}</span>
+                              <div className="flex flex-col gap-0.5 max-w-[70%]"><span className="text-xs font-medium text-zinc-200 truncate">{t.description}</span><span className="text-[10px] text-zinc-500">{formatDate(t.created_at)}</span></div><span className="text-xs font-bold text-white whitespace-nowrap">{formatCurrency(t.amount)}</span>
                            </div>
                         ))}
-                        {getGroupedTransactions(selectedCcCategory).length === 0 && (
-                           <div className="text-center py-10 text-zinc-600 text-xs">Nenhuma transação encontrada.</div>
-                        )}
                     </div>
                  </div>
               )}
-
            </div>
         </div>
       </div>
