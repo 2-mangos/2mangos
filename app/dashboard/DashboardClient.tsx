@@ -215,7 +215,12 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           </div>
       </div>
 
-      <AIFlashTips userPlan={userProfile.plan} />
+      {/* COMPONENTE IA COM DATA CORRETA */}
+      <AIFlashTips 
+        userPlan={userProfile.plan} 
+        month={selectedMonth} 
+        year={selectedYear} 
+      />
 
       {/* CATEGORIAS E EVOLUÇÃO */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -289,7 +294,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
              </div>
            )}
 
-           {/* --- AQUI ESTÁ A CORREÇÃO DO ERRO DO GRÁFICO --- */}
            <div className="w-full h-[180px] my-4">
              {selectedCcCategory ? (
                <ResponsiveContainer width="100%" height="100%">
