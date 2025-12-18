@@ -1,6 +1,6 @@
 'use client'
 
-import { createClient } from '../../lib/supabase'
+import { createClient } from '../../../lib/supabase'
 import { useState, useRef, useEffect, RefObject } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
@@ -11,14 +11,14 @@ import {
   Wrench, Droplets, Lightbulb, LucideIcon, Dumbbell, Stethoscope, 
   PawPrint, Baby, Shirt, Music, Tv, Wifi, Fuel, Coffee, Bus
 } from 'lucide-react'
-import { useToast } from '../../components/ToastContext'
+import { useToast } from '../../../components/ToastContext'
 
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-import { Account } from '../../lib/types'
-import { formatCurrency } from '../../lib/utils'
+import { Account } from '../../../lib/types'
+import { formatCurrency } from '../../../lib/utils'
 
 // --- CONFIGURAÇÕES ---
 const COLORS = [ 

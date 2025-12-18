@@ -1,6 +1,6 @@
 'use client'
 
-import AIFlashTips from '../../components/AIFlashTips'
+import AIFlashTips from '../../../components/AIFlashTips'
 import { useRouter } from 'next/navigation'
 import { 
   BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, 
@@ -11,10 +11,10 @@ import {
   AlertTriangle, ChevronDown, Lightbulb, Activity, Lock, 
   ArrowLeft, Zap, ChevronRight, CreditCard 
 } from 'lucide-react'
-import { formatCurrency, formatDate } from '../../lib/utils'
+import { formatCurrency, formatDate } from '../../../lib/utils'
 import { useState, useEffect, useMemo, useTransition } from 'react'
-import UpgradeModal from '../../components/UpgradeModal'
-import { getAccountYearlyData } from '../actions/dashboard-data'
+import UpgradeModal from '../../../components/UpgradeModal'
+import { getAccountYearlyData } from '../../actions/dashboard-data'
 
 const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 1 + i)

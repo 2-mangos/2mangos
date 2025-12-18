@@ -1,7 +1,7 @@
-import { createClient } from '../../lib/supabase-server'
+import { createClient } from '../../../lib/supabase-server'
 import { redirect } from 'next/navigation'
 import ExpensesClient from './ExpensesClient'
-import { Expense, Account } from '../../lib/types'
+import { Expense, Account } from '../../../lib/types'
 
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<{ month?: string, year?: string }> }) {
   const params = await searchParams
