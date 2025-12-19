@@ -1,11 +1,14 @@
 'use client'
 
-import { createClient } from '../../lib/supabase'
+// CORREÇÃO: Adicionei mais um "../" para subir o nível correto
+import { createClient } from '../../../lib/supabase' 
+import { useToast } from '../../../components/ToastContext'
+
+// Os outros imports (de bibliotecas instaladas) não mudam:
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import Link from 'next/link'
 import { Wallet } from 'lucide-react'
-import { useToast } from '../../components/ToastContext'
 
 export default function LoginPage() {
   const { addToast } = useToast()
@@ -13,6 +16,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
   
@@ -32,9 +36,18 @@ export default function LoginPage() {
       }
     } else {
       if (username.length < 3) {
-        addToast("O nome de usuário deve ter pelo menos 3 caracteres.", 'info')
+        addToast("Nome de usuário muito curto.", 'info')
         setLoading(false); return
       }
+      if (password !== confirmPassword) {
+        addToast("As senhas não coincidem.", 'error')
+        setLoading(false); return
+      }
+      if (password.length < 6) {
+        addToast("Senha muito curta (min 6).", 'info')
+        setLoading(false); return
+      }
+      
       const cleanUsername = username.replace(/\s/g, '').toLowerCase()
       const { error } = await supabase.auth.signUp({
         email,
@@ -45,8 +58,10 @@ export default function LoginPage() {
       if (error) {
         addToast("Erro ao cadastrar: " + error.message, 'error')
       } else {
-        addToast("Cadastro realizado! Verifique seu e-mail.", 'success')
+        addToast("Verifique seu e-mail para confirmar!", 'success')
         setMode('login')
+        setPassword('')
+        setConfirmPassword('')
       }
     }
     setLoading(false)
@@ -54,7 +69,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#09090b] p-4 relative overflow-hidden">
-        
         {/* Efeito de fundo */}
         <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none"></div>
@@ -67,9 +81,6 @@ export default function LoginPage() {
                 <h2 className="text-2xl font-bold tracking-tight text-white">
                     {mode === 'login' ? 'Bem-vindo de volta' : 'Criar nova conta'}
                 </h2>
-                <p className="mt-2 text-sm text-zinc-400">
-                    Gerencie suas finanças de forma simples e profissional.
-                </p>
             </div>
 
             <div className="flex rounded-lg bg-zinc-950 p-1 border border-white/5">
@@ -81,19 +92,26 @@ export default function LoginPage() {
                 {mode === 'register' && (
                     <div className="animate-in fade-in slide-in-from-top-2">
                         <label className="block text-xs font-bold text-zinc-500 uppercase mb-1.5">Usuário</label>
-                        <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm placeholder:text-zinc-600 transition-all" placeholder="ex: joaosilva"/>
+                        <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="ex: joaosilva"/>
                     </div>
                 )}
 
                 <div>
                     <label className="block text-xs font-bold text-zinc-500 uppercase mb-1.5">E-mail</label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm placeholder:text-zinc-600 transition-all" placeholder="seu@email.com"/>
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="seu@email.com"/>
                 </div>
                 
                 <div>
                     <label className="block text-xs font-bold text-zinc-500 uppercase mb-1.5">Senha</label>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm placeholder:text-zinc-600 transition-all" placeholder="••••••"/>
+                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="••••••"/>
                 </div>
+
+                {mode === 'register' && (
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                        <label className="block text-xs font-bold text-zinc-500 uppercase mb-1.5">Confirmar Senha</label>
+                        <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="••••••"/>
+                    </div>
+                )}
 
                 {mode === 'login' && (
                     <div className="text-right">
@@ -101,7 +119,7 @@ export default function LoginPage() {
                     </div>
                 )}
 
-                <button onClick={handleAuth} disabled={loading} className="w-full flex justify-center py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                <button onClick={handleAuth} disabled={loading} className="w-full flex justify-center py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-50">
                     {loading ? 'Processando...' : (mode === 'login' ? 'Acessar Painel' : 'Criar Conta Grátis')}
                 </button>
             </div>

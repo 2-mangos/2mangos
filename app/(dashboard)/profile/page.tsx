@@ -1,13 +1,13 @@
 'use client'
 
-import { createClient } from '../../lib/supabase'
+import { createClient } from '../../../lib/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   User, LogOut, Shield, Lock, Save, 
   Camera, AlertTriangle, Edit2, Eye, EyeOff, Check, X, Crown, Settings, Trash2 
 } from 'lucide-react' 
-import { useToast } from '../../components/ToastContext'
+import { useToast } from '../../../components/ToastContext'
 
 export default function ProfilePage() {
   const { addToast } = useToast() // Hook de Toast

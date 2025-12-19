@@ -1,21 +1,21 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { createClient } from '../../lib/supabase'
+import { createClient } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { 
   MoreVertical, Edit2, Trash2, Save, X, Search, CreditCard, 
   Plus, Calendar, DollarSign, TrendingDown, Wallet, ListFilter, 
   SquareCheck, Square 
 } from 'lucide-react'
-import NewExpenseModal from '../../components/NewExpenseModal'
-import CreditCardModal from '../../components/CreditCardModal'
-import UpgradeModal from '../../components/UpgradeModal'
-import { useToast } from '../../components/ToastContext'
+import NewExpenseModal from '../../../components/NewExpenseModal'
+import CreditCardModal from '../../../components/CreditCardModal'
+import UpgradeModal from '../../../components/UpgradeModal'
+import { useToast } from '../../../components/ToastContext'
 
 // Importando Tipos e Utils
-import { Expense, CreateExpenseDTO } from '../../lib/types'
-import { formatCurrency, formatDate } from '../../lib/utils'
+import { Expense, CreateExpenseDTO } from '../../../lib/types'
+import { formatCurrency, formatDate } from '../../../lib/utils'
 
 const pillBaseClass = "inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-medium whitespace-nowrap transition-colors border"
 const cardClass = "card relative p-5 flex flex-col justify-between h-32 md:h-40"

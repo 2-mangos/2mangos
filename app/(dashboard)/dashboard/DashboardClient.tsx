@@ -1,6 +1,6 @@
 'use client'
 
-import AIFlashTips from '../../components/AIFlashTips'
+import AIFlashTips from '../../../components/AIFlashTips'
 import { useRouter } from 'next/navigation'
 import { 
   BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, 
@@ -9,16 +9,17 @@ import {
 import { 
   TrendingUp, TrendingDown, DollarSign, CalendarClock, Wallet, 
   AlertTriangle, ChevronDown, Lightbulb, Activity, Lock, 
-  PieChart, ArrowLeft, Target, Zap, ChevronRight, CreditCard 
+  ArrowLeft, Zap, ChevronRight, CreditCard 
 } from 'lucide-react'
-import { formatCurrency, formatDate } from '../../lib/utils'
+import { formatCurrency, formatDate } from '../../../lib/utils'
 import { useState, useEffect, useMemo, useTransition } from 'react'
-import UpgradeModal from '../../components/UpgradeModal'
-import { getAccountYearlyData } from '../actions/dashboard-data'
+import UpgradeModal from '../../../components/UpgradeModal'
+import { getAccountYearlyData } from '../../actions/dashboard-data'
 
 const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 1 + i)
-const categoryColors: Record<string, string> = { 'Alimentação': '#F97316', 'Transporte': '#3B82F6', 'Lazer': '#A855F7', 'Mercado': '#22C55E', 'Serviços': '#6B7280', 'Compras': '#EC4899', 'Saúde': '#EF4444', 'Outros': '#94A3B8' }
+
+// Cores Gerais do Dashboard
 const colors = { red: '#f43f5e', green: '#10b981', yellow: '#f59e0b', indigo: '#6366f1', slate: '#3f3f46' }
 const cardClass = "card relative p-5 flex flex-col justify-between h-44"
 const iconBadgeClass = "absolute top-5 right-5 w-9 h-9 rounded-lg flex items-center justify-center bg-white/5 text-indigo-400 border border-white/5"
@@ -58,6 +59,18 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   const isSpendingMore = data.percentageChange > 0
   const activeCreditLimit = data.totalCreditLimit > 0 ? data.totalCreditLimit : 0;
   
+  // --- LÓGICA DE CORES DO CARTÃO (Tons de Roxo/Índigo) ---
+  const maxCcValue = Math.max(...(data.ccCategoryData.map(c => c.value) || [0]), 1)
+
+  const getCcBarColor = (value: number) => {
+      const ratio = value / maxCcValue
+      if (ratio > 0.8) return '#a855f7' // Crítico/Pico (Purple-500)
+      if (ratio > 0.5) return '#6366f1' // Alto (Indigo-500 - Base do sistema)
+      if (ratio > 0.2) return '#818cf8' // Médio (Indigo-400)
+      return '#a5b4fc'                  // Baixo (Indigo-300)
+  }
+  // ----------------------------------------------
+
   useEffect(() => {
     if (selectedAccount) {
       startTransition(async () => {
@@ -71,7 +84,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     router.push(`/dashboard?month=${month}&year=${year}`)
   }
 
-  // Lógica Widget Fatura
   const getGroupedTransactions = (category: string) => {
     const rawList = data.ccTransactions.filter(t => t.category === category)
     return rawList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -99,9 +111,11 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
   const limitUsedPercent = activeCreditLimit > 0 ? (data.ccTotal / activeCreditLimit) * 100 : 0
   const limitAvailable = activeCreditLimit - data.ccTotal
+  
   let limitBarColor = 'bg-indigo-500'
-  if (limitUsedPercent > 100) limitBarColor = 'bg-red-500'
-  else if (limitUsedPercent > 80) limitBarColor = 'bg-yellow-500'
+  if (limitUsedPercent > 100) limitBarColor = 'bg-red-600'
+  else if (limitUsedPercent > 80) limitBarColor = 'bg-red-500'
+  else if (limitUsedPercent > 50) limitBarColor = 'bg-yellow-500'
 
   const dynamicInsightText = useMemo(() => {
     if (selectedCcCategory) {
@@ -111,7 +125,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     }
     if (projection > activeCreditLimit && activeCreditLimit > 0) return `Atenção: Projeção de ${formatCurrency(projection)} pode estourar limite.`
     if (isCurrentMonth && projection > data.ccTotal * 1.2) return `Cuidado: Gastos diários (${formatCurrency(dailyAvg)}) acima da média.`
-    return "Gastos controlados. Nenhuma anomalia crítica."
+    return "Gastos do cartão sob análise."
   }, [selectedCcCategory, projection, dailyAvg, data.ccTotal, data.ccCategoryData, activeCreditLimit, isCurrentMonth])
 
   let scoreTextColor = 'text-red-400', scoreLabel = 'Crítico', scoreDesc = 'Gastos excedendo renda.'
@@ -215,7 +229,12 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           </div>
       </div>
 
-      <AIFlashTips userPlan={userProfile.plan} />
+      {/* COMPONENTE ONDA IA */}
+      <AIFlashTips 
+        userPlan={userProfile.plan} 
+        month={selectedMonth} 
+        year={selectedYear} 
+      />
 
       {/* CATEGORIAS E EVOLUÇÃO */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -268,18 +287,19 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
         {userProfile.plan === 'free' && <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center p-6"><div className="bg-zinc-800 p-3 rounded-full mb-3"><Lock className="text-yellow-400" size={20} /></div><h3 className="text-base font-bold text-white">Painel de Fatura Pro</h3><p className="text-xs text-zinc-400 mb-4 max-w-xs">Desbloqueie análises de projeção e insights.</p><button onClick={() => setShowUpgradeModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">Desbloquear Premium</button></div>}
 
         <div className="w-full md:w-[40%] bg-zinc-900/30 border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col relative justify-between">
-           <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                 <span className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center"><PieChart size={14} /></span>
+           
+           {/* CABEÇALHO PADRONIZADO */}
+           <div className="mb-4">
+              <h3 className="text-base font-semibold text-white">
                  {selectedCcCategory ? `Foco: ${selectedCcCategory}` : 'Fatura Aberta'}
               </h3>
-              <p className="text-[11px] text-zinc-500 mt-1 ml-10">
+              <p className="text-xs text-zinc-500">
                 {selectedCcCategory ? 'Evolução diária' : 'Análise de impacto'}
               </p>
            </div>
            
            {activeCreditLimit > 0 && !selectedCcCategory && (
-             <div className="mt-4 bg-zinc-950/50 p-3 rounded-xl border border-white/5 animate-in fade-in slide-in-from-top-2">
+             <div className="mt-2 bg-zinc-950/50 p-3 rounded-xl border border-white/5 animate-in fade-in slide-in-from-top-2">
                <div className="flex justify-between items-end mb-2">
                  <div><span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Comprometido</span><span className="text-xs font-bold text-white flex items-center gap-1">{limitUsedPercent.toFixed(1)}% <CreditCard size={10} className="text-zinc-600"/></span></div>
                  <div className="text-right"><span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Disponível</span><span className={`text-xs font-bold ${limitAvailable < 0 ? 'text-red-400' : 'text-emerald-400'}`}>{formatCurrency(limitAvailable)}</span></div>
@@ -289,14 +309,13 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
              </div>
            )}
 
-           {/* --- AQUI ESTÁ A CORREÇÃO DO ERRO DO GRÁFICO --- */}
            <div className="w-full h-[180px] my-4">
              {selectedCcCategory ? (
                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={categoryDailyEvolution} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                    <defs><linearGradient id="colorSplit" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={categoryColors[selectedCcCategory] || '#6366f1'} stopOpacity={0.3}/><stop offset="95%" stopColor={categoryColors[selectedCcCategory] || '#6366f1'} stopOpacity={0}/></linearGradient></defs>
+                    <defs><linearGradient id="colorSplit" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/></linearGradient></defs>
                     <Tooltip cursor={{stroke: '#ffffff20'}} contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '11px' }} />
-                    <Area type="monotone" dataKey="value" stroke={categoryColors[selectedCcCategory] || '#6366f1'} fill="url(#colorSplit)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="value" stroke="#6366f1" fill="url(#colorSplit)" strokeWidth={2} />
                     <XAxis dataKey="day" hide /><YAxis hide />
                   </AreaChart>
                </ResponsiveContainer>
@@ -305,9 +324,17 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.ccCategoryData.slice(0, 5)} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
                       <XAxis type="number" hide /><YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#71717a', fontWeight: 600 }} width={70} tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{fill: '#ffffff05'}} contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '11px' }} />
+                      {/* TOOLTIP CORRIGIDO PARA MOSTRAR COR CLARA E FORMATO DE MOEDA */}
+                      <Tooltip 
+                        cursor={{fill: '#ffffff05'}} 
+                        contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '11px' }} 
+                        itemStyle={{ color: '#e4e4e7' }}
+                        formatter={(value: number) => [formatCurrency(value), 'Valor']}
+                      />
                       <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
-                        {data.ccCategoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={categoryColors[entry.name] || '#6366f1'} />)}
+                        {data.ccCategoryData.map((entry, index) => (
+                           <Cell key={`cell-${index}`} fill={getCcBarColor(entry.value)} />
+                        ))}
                       </Bar>
                     </BarChart>
                  </ResponsiveContainer>
@@ -339,7 +366,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                     {data.ccCategoryData.map((cat) => (
                        <button key={cat.name} onClick={() => setSelectedCcCategory(cat.name)} className="w-full flex items-center justify-between p-3 bg-zinc-900/30 border border-transparent hover:border-white/5 hover:bg-zinc-800/50 rounded-xl transition-all group">
                           <div className="flex items-center gap-3 overflow-hidden">
-                             <div className="w-1.5 h-8 rounded-full shrink-0" style={{backgroundColor: categoryColors[cat.name] || '#71717a'}}></div>
+                             <div className="w-1.5 h-8 rounded-full shrink-0" style={{backgroundColor: getCcBarColor(cat.value) }}></div>
                              <div className="text-left overflow-hidden"><p className="text-xs font-bold text-zinc-300 group-hover:text-white transition-colors truncate">{cat.name}</p><div className="flex items-center gap-1 mt-0.5"><div className="w-16 h-1 bg-zinc-800 rounded-full overflow-hidden shrink-0"><div className="h-full bg-zinc-500 group-hover:bg-indigo-500 transition-colors" style={{width: `${data.ccTotal > 0 ? ((cat.value / data.ccTotal) * 100) : 0}%`}}></div></div><span className="text-[9px] text-zinc-500">{data.ccTotal > 0 ? ((cat.value / data.ccTotal) * 100).toFixed(0) : 0}%</span></div></div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0"><span className="text-xs font-bold text-zinc-400 group-hover:text-white">{formatCurrency(cat.value)}</span><ChevronRight size={14} className="text-zinc-700 group-hover:text-zinc-400"/></div>

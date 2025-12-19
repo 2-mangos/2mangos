@@ -1,7 +1,7 @@
-import { createClient } from '../../lib/supabase-server'
+import { createClient } from '../../../lib/supabase-server'
 import { redirect } from 'next/navigation'
 import AccountsClient from './AccountsClient'
-import { Account } from '../../lib/types'
+import { Account } from '../../../lib/types'
 
 export default async function AccountsPage() {
   const supabase = await createClient()

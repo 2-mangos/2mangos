@@ -1,15 +1,17 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { createClient } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { 
   Plus, Trash2, Search, DollarSign, X, Save, MoreVertical, Edit2, 
-  TrendingUp, Calendar, Wallet, ListFilter, Square, SquareCheck // <--- Novos ícones importados
+  TrendingUp, Calendar, Wallet, ListFilter, Square, SquareCheck 
 } from 'lucide-react'
-import { useToast } from '../../components/ToastContext'
-import { Income } from '../../lib/types'
-import { formatCurrency, formatDate } from '../../lib/utils'
+
+// CORREÇÃO: Caminhos ajustados para subir 3 níveis (../../../)
+import { createClient } from '../../../lib/supabase'
+import { useToast } from '../../../components/ToastContext'
+import { Income } from '../../../lib/types'
+import { formatCurrency, formatDate } from '../../../lib/utils'
 
 // Constantes
 const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -40,7 +42,7 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
   const [formData, setFormData] = useState({ description: '', amount: '', date: '' })
   const [isLoadingSave, setIsLoadingSave] = useState(false)
   
-  // Estados de Seleção (NOVO)
+  // Estados de Seleção
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   // Estados de Edição/Menu
@@ -50,7 +52,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
   
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Fechar menu ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -61,17 +62,14 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Filtragem local
   const filteredIncomes = initialIncomes.filter(inc => 
     inc.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Atualizar URL ao mudar filtros
   function handleFilterChange(month: number, year: number) {
     router.push(`/incomes?month=${month}&year=${year}`)
   }
 
-  // --- LÓGICA DE SELEÇÃO (NOVA) ---
   function handleSelectAll() {
     if (selectedIds.length === filteredIncomes.length) setSelectedIds([])
     else setSelectedIds(filteredIncomes.map(e => e.id))
@@ -81,8 +79,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(sid => sid !== id))
     else setSelectedIds([...selectedIds, id])
   }
-
-  // --- AÇÕES (CRUD) ---
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -111,7 +107,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     setIsLoadingSave(false)
   }
 
-  // Ação de Deletar Um (existente)
   async function handleDelete(id: string) {
     if (!confirm('Tem certeza que deseja apagar esta entrada?')) return
     const { error } = await supabase.from('incomes').delete().eq('id', id)
@@ -122,7 +117,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     }
   }
 
-  // Ação de Deletar Selecionados (NOVA)
   async function handleDeleteSelected() {
     if (selectedIds.length === 0) return
     if (!confirm(`Excluir ${selectedIds.length} itens?`)) return 
@@ -249,7 +243,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                 <div className="flex items-center gap-4">
                     <h3 className="text-base font-bold text-white">Histórico de Entradas</h3>
                     
-                    {/* Botão de Excluir Selecionados (Aparece condicionalmente) */}
                     {selectedIds.length > 0 && (
                         <button 
                             onClick={handleDeleteSelected}
@@ -277,7 +270,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                     <table className="min-w-full divide-y divide-white/5">
                         <thead className="bg-zinc-900/50 sticky top-0 z-10 backdrop-blur-md">
                             <tr>
-                                {/* CHECKBOX HEADER */}
                                 <th className="px-6 py-3 w-10">
                                     <button onClick={handleSelectAll} className="text-zinc-500 hover:text-white transition-colors">
                                         {filteredIncomes.length > 0 && selectedIds.length === filteredIncomes.length ? (
@@ -301,7 +293,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                                     const isSelected = selectedIds.includes(inc.id)
                                     return (
                                         <tr key={inc.id} className={`transition-colors group ${isSelected ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/5'}`}>
-                                            {/* CHECKBOX ROW */}
                                             <td className="px-6 py-3">
                                                 <button onClick={() => handleSelectOne(inc.id)} className="text-zinc-500 hover:text-white">
                                                     {isSelected ? <SquareCheck size={16} className="text-emerald-500" /> : <Square size={16} />}
@@ -356,7 +347,7 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
             </div>
         </div>
 
-        {/* FOOTER BAR (NOVO) */}
+        {/* FOOTER BAR */}
         <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur border-t border-white/5 p-3 md:pl-64 z-40">
            <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-zinc-500">
               <div className="flex items-center gap-2">
@@ -369,7 +360,7 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
            </div>
         </div>
 
-        {/* MODAL NOVA RECEITA */}
+        {/* MODAL */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="w-full max-w-md bg-zinc-900 rounded-xl shadow-2xl p-6 border border-white/10 animate-in fade-in zoom-in-95">
