@@ -56,7 +56,8 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [selectedCcCategory, setSelectedCcCategory] = useState<string | null>(null)
 
-  const currentBalance = data.totalIncome - data.currentMonthTotal
+  // VOCABULÁRIO: Resultado (antigo Saldo)
+  const currentResult = data.totalIncome - data.currentMonthTotal
   const isSpendingMore = data.percentageChange > 0
   const activeCreditLimit = data.totalCreditLimit > 0 ? data.totalCreditLimit : 0;
   
@@ -77,67 +78,41 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
   const COLORS_PIE = ['#6366f1', '#a5b4fc']
 
-  // --- INSIGHT PARA O CARD DE GASTOS (MAIOR) ---
+  // --- INSIGHTS (VOCABULÁRIO ATUALIZADO) ---
   const expensesInsight = useMemo(() => {
     let deficitStreak = 0;
     const activeMonths = data.chartData.filter(d => d.expense > 0 || d.income > 0).slice(-3);
     
-    activeMonths.forEach(m => {
-        if (m.expense > m.income) deficitStreak++;
-    });
+    activeMonths.forEach(m => { if (m.expense > m.income) deficitStreak++; });
 
-    if (deficitStreak >= 3) return "Alerta: Há 3 meses você gasta mais do que ganha.";
-    if (deficitStreak === 2) return "Cuidado: 2º mês seguido de gastos acima da renda.";
-
-    if (data.totalIncome > 0 && data.currentMonthTotal > data.totalIncome) {
-        return `Atenção: Seus gastos já superaram sua renda deste mês.`;
-    }
-
-    if (data.percentageChange > 25) {
-        return `Seus gastos subiram ${data.percentageChange.toFixed(0)}% comparado ao mês anterior.`;
-    }
-
-    if (data.percentageChange < -10) {
-        return `Ótimo! Você reduziu seus gastos em ${Math.abs(data.percentageChange).toFixed(0)}% este mês.`;
-    }
-
-    return "Seus gastos estão estáveis e dentro da média.";
+    if (deficitStreak >= 3) return "Alerta: Há 3 meses suas despesas superam as receitas.";
+    if (deficitStreak === 2) return "Cuidado: 2º mês seguido de despesas acima da receita.";
+    if (data.totalIncome > 0 && data.currentMonthTotal > data.totalIncome) return `Atenção: Suas despesas já superaram sua receita deste período.`;
+    if (data.percentageChange > 25) return `Suas despesas subiram ${data.percentageChange.toFixed(0)}% comparado ao período anterior.`;
+    if (data.percentageChange < -10) return `Ótimo! Você reduziu suas despesas em ${Math.abs(data.percentageChange).toFixed(0)}% neste período.`;
+    return "Suas despesas estão estáveis e dentro da média.";
   }, [data.chartData, data.currentMonthTotal, data.totalIncome, data.percentageChange]);
 
-
-  // --- INSIGHT PARA OS CARDS MENORES ---
   const miniInsight = useMemo(() => {
-    const balance = data.totalIncome - data.currentMonthTotal;
+    const result = data.totalIncome - data.currentMonthTotal;
     const highest = data.highestExpense;
-
-    if (balance < 0) {
-      return `Alerta: Saldo negativo! ${highest?.name || 'Maior despesa'} impactou seu orçamento.`;
-    }
-    if (highest && highest.value > (data.currentMonthTotal * 0.4)) {
-       return `Atenção: ${highest.name} representa mais de 40% dos gastos.`;
-    }
-    if (balance > 0 && balance < (data.totalIncome * 0.1)) {
-       return `Saldo positivo, mas apertado. Cuidado com ${highest?.name}.`;
-    }
-    return `Ótimo fluxo! Saldo positivo e controle sobre as despesas.`;
+    if (result < 0) return `Alerta: Resultado negativo! ${highest?.name || 'Maior despesa'} impactou seu orçamento.`;
+    if (highest && highest.value > (data.currentMonthTotal * 0.4)) return `Atenção: ${highest.name} representa mais de 40% das despesas.`;
+    if (result > 0 && result < (data.totalIncome * 0.1)) return `Resultado positivo, mas apertado. Cuidado com ${highest?.name}.`;
+    return `Ótimo fluxo! Resultado positivo e controle sobre as despesas.`;
   }, [data.totalIncome, data.currentMonthTotal, data.highestExpense]);
 
-  // --- INSIGHT DO PERFIL DE GASTOS ---
   const profileInsight = useMemo(() => {
     const fixed = data.expenseTypeBreakdown.fixed || 0;
     const variable = data.expenseTypeBreakdown.variable || 0;
     const total = fixed + variable;
-
     if (total === 0) return "Sem dados suficientes.";
-
     const fixedPercent = (fixed / total) * 100;
     const variablePercent = (variable / total) * 100;
-
-    if (fixedPercent > 70) return `Alerta: ${fixedPercent.toFixed(0)}% dos gastos são fixos.`;
+    if (fixedPercent > 70) return `Alerta: ${fixedPercent.toFixed(0)}% das despesas são fixas.`;
     if (variablePercent > 60) return `Atenção: Variáveis representam ${variablePercent.toFixed(0)}%.`;
-    return `Perfil: ${fixedPercent.toFixed(0)}% Fixos vs ${variablePercent.toFixed(0)}% Variáveis.`;
+    return `Perfil: ${fixedPercent.toFixed(0)}% Fixas vs ${variablePercent.toFixed(0)}% Variáveis.`;
   }, [data.expenseTypeBreakdown]);
-
 
   useEffect(() => {
     if (selectedAccount) {
@@ -191,11 +166,11 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
        return `Você gastou ${formatCurrency(catVal)} em ${selectedCcCategory}. Isso representa ${percent}% da sua fatura.`
     }
     if (projection > activeCreditLimit && activeCreditLimit > 0) return `Atenção: Projeção de ${formatCurrency(projection)} pode estourar limite.`
-    if (isCurrentMonth && projection > data.ccTotal * 1.2) return `Cuidado: Gastos diários (${formatCurrency(dailyAvg)}) acima da média.`
-    return "Gastos do cartão sob análise."
+    if (isCurrentMonth && projection > data.ccTotal * 1.2) return `Cuidado: Despesas diárias (${formatCurrency(dailyAvg)}) acima da média.`
+    return "Despesas do cartão sob análise."
   }, [selectedCcCategory, projection, dailyAvg, data.ccTotal, data.ccCategoryData, activeCreditLimit, isCurrentMonth])
 
-  let scoreTextColor = 'text-red-400', scoreLabel = 'Crítico', scoreDesc = 'Gastos excedendo renda.'
+  let scoreTextColor = 'text-red-400', scoreLabel = 'Crítico', scoreDesc = 'Despesas excedendo Receitas.'
   if (data.healthScore >= 80) { scoreTextColor = 'text-indigo-400'; scoreLabel = 'Excelente'; scoreDesc = 'Parabéns! Poupando muito.' }
   else if (data.healthScore >= 50) { scoreTextColor = 'text-yellow-400'; scoreLabel = 'Atenção'; scoreDesc = 'No limite.' }
 
@@ -203,14 +178,15 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     <div className="space-y-6 animate-in fade-in duration-500">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
         <div>
           <h1 className="text-3xl font-semibold text-white tracking-tight">Visão Geral</h1>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2">
             <p className="text-zinc-400 text-sm">Olá, <strong className="text-zinc-200">{userProfile.name}</strong></p>
             <span className="hidden sm:block text-zinc-600">•</span>
+            {/* VOCABULÁRIO: Resultado */}
             <div className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400/90 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/10">
-               <Lightbulb size={10} strokeWidth={3}/> {currentBalance < 0 ? 'Déficit mensal.' : 'Balanço positivo.'}
+               <Lightbulb size={10} strokeWidth={3}/> {currentResult < 0 ? 'Resultado negativo.' : 'Resultado positivo.'}
             </div>
           </div>
         </div>
@@ -235,6 +211,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
           <div className="flex items-center bg-zinc-900/50 border border-white/5 rounded-lg p-1">
              <div className="relative">
+                {/* VOCABULÁRIO: Período (implícito nos seletores) */}
                 <select value={selectedMonth} onChange={(e) => handleFilterChange(parseInt(e.target.value), selectedYear)} className="bg-transparent text-zinc-300 text-sm font-medium py-1.5 pl-3 pr-2 cursor-pointer hover:text-white outline-none [&>option]:bg-zinc-900">
                   {monthNames.map((m, i) => (<option key={i} value={i}>{m}</option>))}
                 </select>
@@ -249,29 +226,26 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
         </div>
       </div>
 
-      {/* MASONRY LAYOUT MANUAL - 2 COLUNAS PRINCIPAIS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         
         {/* --- COLUNA ESQUERDA (33%) --- */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           
-          {/* 1. GASTOS (Topo) */}
+          {/* 1. DESPESAS (VOCABULÁRIO: Gastos -> Despesas) */}
           <div className={`${cardClassBase} h-52 p-5`}>
             <div className="space-y-1">
-                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Gastos</p>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Despesas</p>
                 <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(data.currentMonthTotal)}</h3>
                 
-                {/* PORCENTAGEM (AGORA NO TOPO) */}
                 <div className={`inline-flex items-center gap-1.5 text-xs font-medium mt-1 ${isSpendingMore ? 'text-rose-400' : 'text-emerald-400'}`}>
                     {isSpendingMore ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}
                     {Math.abs(data.percentageChange).toFixed(1)}% 
-                    <span className="text-zinc-500 font-normal">vs. mês anterior</span>
+                    <span className="text-zinc-500 font-normal">vs. anterior</span>
                 </div>
             </div>
             
             <div className="absolute top-5 right-5 w-9 h-9 rounded-lg flex items-center justify-center bg-white/5 text-indigo-400 border border-white/5"><DollarSign size={18} strokeWidth={2} /></div>
             
-            {/* INSIGHT DE GASTOS (AGORA NO RODAPÉ) */}
             <div className="mt-auto">
                 <div className="flex items-center gap-2 bg-indigo-500/10 p-2 rounded-lg border border-indigo-500/20 backdrop-blur-sm">
                     <Sparkles size={12} className="text-indigo-400 shrink-0" fill="currentColor" fillOpacity={0.2} />
@@ -280,10 +254,10 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
             </div>
           </div>
 
-          {/* 2. GRÁFICO PIZZA (Logo abaixo) */}
+          {/* 2. GRÁFICO PIZZA (VOCABULÁRIO: Perfil de Despesas) */}
           <div className="card h-[440px] flex flex-col p-5">
               <div className="mb-2">
-                  <h3 className="text-base font-semibold text-white">Perfil de Gastos</h3>
+                  <h3 className="text-base font-semibold text-white">Perfil de Despesas</h3>
                   <p className="text-xs text-zinc-500">Fixas vs Variáveis</p>
               </div>
               {expenseTypeData.length > 0 ? (
@@ -328,7 +302,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                   <div className="h-full flex items-center justify-center text-zinc-600 text-sm">Sem dados classificados.</div>
               )}
 
-              {/* BARRA DE INSIGHT DO PERFIL */}
               <div className="mt-3">
                   <div className="flex items-center gap-2 bg-indigo-500/10 p-2 rounded-lg border border-indigo-500/20 backdrop-blur-sm">
                       <Sparkles size={12} className="text-indigo-400 shrink-0" fill="currentColor" fillOpacity={0.2} />
@@ -340,24 +313,23 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
         </div>
 
         {/* --- COLUNA DIREITA (66%) --- */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="lg:col-span-2 flex flex-col gap-4">
 
-          {/* 3. GRID 3 CARDS MENORES */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
              
-             {/* Saldo Compacto */}
+             {/* VOCABULÁRIO: Resultado (antigo Saldo) */}
              <div className={`${cardClassBase} h-28 p-4`}>
-                <div className="space-y-0.5"><p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Saldo</p><h3 className={`text-xl font-bold tracking-tight ${currentBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(currentBalance)}</h3></div>
+                <div className="space-y-0.5"><p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Resultado</p><h3 className={`text-xl font-bold tracking-tight ${currentResult < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(currentResult)}</h3></div>
                 <div className={iconBadgeClass}><Wallet size={16} strokeWidth={2} /></div>
              </div>
 
-             {/* Maior Despesa Compacto */}
+             {/* Maior Despesa (VOCABULÁRIO MANTIDO) */}
              <div className={`${cardClassBase} h-28 p-4`}>
                 <div className="w-full space-y-0.5"><p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Maior despesa</p>{data.highestExpense ? (<><h3 className="text-xs font-semibold text-zinc-200 truncate pr-6" title={data.highestExpense.name}>{data.highestExpense.name}</h3><p className="text-lg font-bold text-zinc-100">{formatCurrency(data.highestExpense.value)}</p></>) : <span className="text-xs text-zinc-600">--</span>}</div>
                 <div className={iconBadgeClass}><AlertTriangle size={16} strokeWidth={2} /></div>
              </div>
 
-             {/* Placeholder Compacto */}
+             {/* Placeholder */}
              <div className={`${cardClassBase} h-28 border-2 border-dashed border-zinc-800 bg-transparent opacity-50 hover:opacity-100 transition-opacity p-4`}>
                 <div className="flex items-center justify-center w-full h-full">
                   <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Em Breve</span>
@@ -365,16 +337,15 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
              </div>
           </div>
 
-          {/* 4. BARRA DE INSIGHT MENOR */}
-          <div className="h-10 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-4 flex items-center justify-center gap-2.5">
+          <div className="h-10 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-4 flex items-center justify-start gap-2.5">
             <Sparkles size={14} className="text-indigo-400 shrink-0" fill="currentColor" fillOpacity={0.2} />
             <p className="text-[11px] font-medium text-indigo-100 truncate">{miniInsight}</p>
           </div>
 
-          {/* 5. FLUXO DE CAIXA (Abaixo do Insight) */}
+          {/* 5. FLUXO FINANCEIRO (VOCABULÁRIO: Fluxo de Caixa -> Fluxo Financeiro) */}
           <div className="card h-[440px] p-5">
             <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div><h3 className="text-base font-semibold text-white">Fluxo de Caixa</h3><p className="text-xs text-zinc-500">Anual ({selectedYear})</p></div>
+                <div><h3 className="text-base font-semibold text-white">Fluxo Financeiro</h3><p className="text-xs text-zinc-500">Anual ({selectedYear})</p></div>
                 <div className="bg-zinc-900 border border-white/5 p-0.5 rounded-lg flex">
                     {[{ key: 'all', label: 'Tudo' }, { key: 'income', label: 'Receitas' }, { key: 'expense', label: 'Despesas' }].map((filter) => (
                         <button key={filter.key} onClick={() => setChartFilter(filter.key)} className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all duration-200 ${chartFilter === filter.key ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}>{filter.label}</button>
@@ -400,10 +371,9 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
       </div>
 
-      {/* CATEGORIAS E EVOLUÇÃO */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
           <div className="card rounded-2xl p-5">
-            <div className="mb-6"><h3 className="text-base font-semibold text-white">Categorias</h3><p className="text-xs text-zinc-500">Top gastos do mês</p></div>
+            <div className="mb-6"><h3 className="text-base font-semibold text-white">Categorias</h3><p className="text-xs text-zinc-500">Top despesas do período</p></div>
             <div className="space-y-4">
               {data.topCategories.length > 0 ? (data.topCategories.map((cat, index) => (
                 <div key={index} className="group">
@@ -412,7 +382,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                     <div className="text-right flex items-center gap-2"><span className="font-semibold text-white">{formatCurrency(cat.value)}</span><span className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">{cat.percent.toFixed(0)}%</span></div>
                   </div>
                   <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${cat.percent}%`, backgroundColor: index === 0 ? '#6366F1' : index === 1 ? '#818CF8' : '#A5B4FC' }} /></div>
-                </div>))) : ( <div className="flex h-[200px] items-center justify-center text-zinc-600 text-sm">Nenhum gasto neste mês.</div> )}
+                </div>))) : ( <div className="flex h-[200px] items-center justify-center text-zinc-600 text-sm">Nenhuma despesa neste período.</div> )}
             </div>
           </div>
           
@@ -446,13 +416,11 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           </div>
       </div>
 
-      {/* WIDGET FATURA ABERTA */}
       <div className="card rounded-2xl relative overflow-hidden flex flex-col md:flex-row min-h-[450px] mt-6">
         {userProfile.plan === 'free' && <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center p-6"><div className="bg-zinc-800 p-3 rounded-full mb-3"><Lock className="text-yellow-400" size={20} /></div><h3 className="text-base font-bold text-white">Painel de Fatura Pro</h3><p className="text-xs text-zinc-400 mb-4 max-w-xs">Desbloqueie análises de projeção e insights.</p><button onClick={() => setShowUpgradeModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">Desbloquear Premium</button></div>}
 
         <div className="w-full md:w-[40%] bg-zinc-900/30 border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col relative justify-between">
            
-           {/* CABEÇALHO PADRONIZADO */}
            <div className="mb-4">
               <h3 className="text-base font-semibold text-white">
                  {selectedCcCategory ? `Foco: ${selectedCcCategory}` : 'Fatura Aberta'}
@@ -514,7 +482,8 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
         <div className="w-full md:w-[60%] p-6 flex flex-col h-full bg-zinc-900/10">
            <div className="flex justify-between items-center mb-4">
-              <div><h3 className="text-base font-semibold text-white">Extrato da Fatura</h3><p className="text-xs text-zinc-500">Últimos lançamentos</p></div>
+              {/* VOCABULÁRIO: Lançamentos (antigo Extrato da Fatura) */}
+              <div><h3 className="text-base font-semibold text-white">Lançamentos da Fatura</h3><p className="text-xs text-zinc-500">Últimas movimentações</p></div>
               {selectedCcCategory && (
                 <button onClick={() => setSelectedCcCategory(null)} className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 hover:text-white bg-white/5 px-2 py-1 rounded transition-colors"><ArrowLeft size={10}/> VOLTAR</button>
               )}
@@ -531,7 +500,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                        <span className="text-xs font-bold text-white">{formatCurrency(t.amount)}</span>
                     </div>
                    ))
-                 ) : <div className="text-center text-zinc-600 py-10 text-xs">Nenhuma transação encontrada.</div>
+                 ) : <div className="text-center text-zinc-600 py-10 text-xs">Nenhum lançamento encontrado.</div>
               ) : (
                  data.ccCategoryData.map((cat, i) => (
                     <div key={i} onClick={() => setSelectedCcCategory(cat.name)} className="group flex items-center justify-between p-3 rounded-lg border border-white/5 bg-zinc-900/40 hover:bg-zinc-800/60 hover:border-indigo-500/30 cursor-pointer transition-all">

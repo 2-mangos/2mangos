@@ -1,6 +1,6 @@
 'use client'
 
-import { Settings, User, LogOut, ChevronDown } from 'lucide-react'
+import { Settings, User, LogOut, ChevronDown, Loader2 } from 'lucide-react'
 import { createClient } from '../lib/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -10,6 +10,7 @@ export function Header() {
   const [userName, setUserName] = useState('Usuário')
   const [userInitial, setUserInitial] = useState('U')
   const [userPlan, setUserPlan] = useState('Free')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null) // Novo estado para foto
   
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   
@@ -17,6 +18,7 @@ export function Header() {
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // Fecha menu ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: any) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -27,19 +29,37 @@ export function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  useEffect(() => {
-    async function getUserData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário'
-        setUserName(name)
-        setUserInitial(name.charAt(0).toUpperCase())
-        
-        const { data: userData } = await supabase.from('users').select('plano').eq('id', user.id).single()
-        if (userData) setUserPlan(userData.plano === 'premium' ? 'Premium' : 'Free')
+  // Função que busca os dados
+  const fetchUserData = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário'
+      setUserName(name)
+      setUserInitial(name.charAt(0).toUpperCase())
+      
+      // Busca dados extras (Plano e Foto)
+      const { data: userData } = await supabase.from('users').select('plano, avatar_url').eq('id', user.id).single()
+      if (userData) {
+        setUserPlan(userData.plano === 'premium' ? 'Premium' : 'Free')
+        setAvatarUrl(userData.avatar_url) // Salva a foto
       }
     }
-    getUserData()
+  }
+
+  useEffect(() => {
+    fetchUserData() // Busca inicial
+
+    // Listener: Ouve o evento de atualização vindo do Perfil
+    const handleProfileUpdate = () => {
+        fetchUserData()
+    }
+
+    window.addEventListener('profile-updated', handleProfileUpdate)
+
+    // Limpeza ao desmontar
+    return () => {
+        window.removeEventListener('profile-updated', handleProfileUpdate)
+    }
   }, [])
 
   async function handleLogout() {
@@ -63,8 +83,13 @@ export function Header() {
             </div>
             
             <div className="relative">
-                <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-indigo-900/20 ring-2 ring-[#09090b] group-hover:ring-indigo-500/50 transition-all">
-                    {userInitial}
+                {/* Lógica: Se tem foto mostra foto, senão mostra iniciais */}
+                <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-indigo-900/20 ring-2 ring-[#09090b] group-hover:ring-indigo-500/50 transition-all overflow-hidden">
+                    {avatarUrl ? (
+                        <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
+                    ) : (
+                        userInitial
+                    )}
                 </div>
                 <div className="absolute -bottom-1 -right-1 bg-[#09090b] rounded-full p-0.5">
                     <ChevronDown size={10} className="text-zinc-400" />
@@ -89,9 +114,13 @@ export function Header() {
                   <User size={16} /> Meu Perfil
                 </Link>
                 
-                <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors text-left">
+                <Link 
+                  href="/settings"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                >
                   <Settings size={16} /> Configurações
-                </button>
+                </Link>
               </div>
 
               <div className="h-px bg-white/5 my-1 mx-1"></div>
