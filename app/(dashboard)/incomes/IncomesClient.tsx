@@ -7,7 +7,6 @@ import {
   TrendingUp, Calendar, Wallet, ListFilter, Square, SquareCheck 
 } from 'lucide-react'
 
-// CORREÇÃO: Caminhos ajustados para subir 3 níveis (../../../)
 import { createClient } from '../../../lib/supabase'
 import { useToast } from '../../../components/ToastContext'
 import { Income } from '../../../lib/types'
@@ -23,7 +22,6 @@ const iconBadgeClass = "absolute top-5 right-5 w-8 h-8 rounded-lg flex items-cen
 interface IncomesClientProps {
   initialIncomes: Income[]
   kpiData: {
-    totalSelected: number
     totalYear: number
     monthlyAverage: number
   }
@@ -36,16 +34,14 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
   const router = useRouter()
   const supabase = createClient()
 
-  // Estados de Interface
+  // Estados
   const [searchTerm, setSearchTerm] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formData, setFormData] = useState({ description: '', amount: '', date: '' })
   const [isLoadingSave, setIsLoadingSave] = useState(false)
   
-  // Estados de Seleção
+  // Seleção e Menus
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-
-  // Estados de Edição/Menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState({ date: '', amount: '' })
@@ -62,9 +58,13 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  // Filtro Local (Busca)
   const filteredIncomes = initialIncomes.filter(inc => 
     inc.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  // Cálculo Dinâmico do Total (Baseado no filtro)
+  const currentTableTotal = filteredIncomes.reduce((acc, curr) => acc + curr.amount, 0)
 
   function handleFilterChange(month: number, year: number) {
     router.push(`/incomes?month=${month}&year=${year}`)
@@ -79,6 +79,8 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(sid => sid !== id))
     else setSelectedIds([...selectedIds, id])
   }
+
+  // --- CRUD OPERATIONS ---
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -108,25 +110,25 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Tem certeza que deseja apagar esta entrada?')) return
+    if (!confirm('Tem certeza que deseja apagar esta movimentação?')) return
     const { error } = await supabase.from('incomes').delete().eq('id', id)
     if (error) addToast("Erro ao apagar receita", 'error')
     else {
-        addToast("Receita removida", 'success')
+        addToast("Lançamento removido", 'success')
         router.refresh()
     }
   }
 
   async function handleDeleteSelected() {
     if (selectedIds.length === 0) return
-    if (!confirm(`Excluir ${selectedIds.length} itens?`)) return 
+    if (!confirm(`Excluir ${selectedIds.length} lançamentos?`)) return 
 
     const { error } = await supabase.from('incomes').delete().in('id', selectedIds)
     
     if (error) {
       addToast("Erro ao excluir: " + error.message, 'error')
     } else {
-      addToast(`${selectedIds.length} receitas excluídas`, 'success')
+      addToast(`${selectedIds.length} lançamentos excluídos`, 'success')
       setSelectedIds([])
       router.refresh()
     }
@@ -150,7 +152,7 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     if (error) { 
         addToast("Erro ao salvar: " + error.message, 'error') 
     } else { 
-        addToast("Receita atualizada!", 'success')
+        addToast("Lançamento atualizado!", 'success')
         setEditingId(null)
         router.refresh() 
     }
@@ -165,14 +167,15 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Receitas</h1>
-            <p className="text-zinc-400 mt-1 text-sm">Gerencie suas fontes de renda</p>
+            <p className="text-zinc-400 mt-1 text-sm">Gerencie suas <strong className="text-zinc-300">Entradas</strong></p>
           </div>
           
           <div className="flex items-center gap-4">
              <div className="bg-zinc-900 border border-white/5 flex items-center p-1 rounded-lg">
                 <div className="flex items-center gap-2 px-3 border-r border-white/5">
                    <Calendar size={14} className="text-emerald-400"/>
-                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Filtro</span>
+                   {/* VOCABULÁRIO: PERÍODO */}
+                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Período</span>
                 </div>
                 <select 
                     value={selectedMonth} 
@@ -201,31 +204,41 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
           </div>
         </div>
 
-        {/* CARDS */}
+        {/* KPI CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={cardClass}>
                 <div>
+                    {/* VOCABULÁRIO: RECEITAS / BUSCA */}
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
-                        {searchTerm ? 'Busca' : 'Total Selecionado'}
+                        {searchTerm ? 'Busca' : 'Receitas'}
                     </p>
-                    <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(kpiData.totalSelected)}</h3>
+                    <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(currentTableTotal)}</h3>
                 </div>
-                <div className={iconBadgeClass}><DollarSign size={18} strokeWidth={2} /></div>
+                <div className={iconBadgeClass}><TrendingUp size={18} strokeWidth={2} /></div>
                 <div className="mt-auto">
                     <span className="text-[10px] text-emerald-400 font-medium bg-emerald-500/10 px-2 py-1 rounded">
-                        Receita Consolidada
+                        Total do Período
                     </span>
                 </div>
             </div>
 
             <div className={cardClass}>
                 <div>
+                    {/* VOCABULÁRIO: FLUXO FINANCEIRO */}
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
-                        Acumulado {selectedYear === -1 ? new Date().getFullYear() : selectedYear}
+                        Fluxo Financeiro
                     </p>
                     <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(kpiData.totalYear)}</h3>
                 </div>
-                <div className={iconBadgeClass}><TrendingUp size={18}/></div>
+                {/* Ícone de Carteira para Fluxo */}
+                <div className="absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-zinc-400">
+                    <Wallet size={18}/>
+                </div>
+                <div className="mt-auto">
+                    <span className="text-[10px] text-zinc-500">
+                        Acumulado {selectedYear === -1 ? new Date().getFullYear() : selectedYear}
+                    </span>
+                </div>
             </div>
 
             <div className={cardClass}>
@@ -233,7 +246,9 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">Média Mensal</p>
                     <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(kpiData.monthlyAverage)}</h3>
                 </div>
-                <div className="absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-blue-400"><Wallet size={18}/></div>
+                <div className="absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-blue-400">
+                    <DollarSign size={18}/>
+                </div>
             </div>
         </div>
 
@@ -241,7 +256,8 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    <h3 className="text-base font-bold text-white">Histórico de Entradas</h3>
+                    {/* VOCABULÁRIO: MOVIMENTAÇÕES */}
+                    <h3 className="text-base font-bold text-white">Movimentações</h3>
                     
                     {selectedIds.length > 0 && (
                         <button 
@@ -259,7 +275,7 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                         type="text" 
                         value={searchTerm} 
                         onChange={(e) => setSearchTerm(e.target.value)} 
-                        placeholder="Buscar receita..." 
+                        placeholder="Filtrar Lançamentos..." 
                         className="w-full rounded-lg border border-white/5 bg-zinc-900 py-1.5 pl-9 pr-3 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-zinc-600 transition-all"
                     />
                 </div>
@@ -279,15 +295,17 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                                         )}
                                     </button>
                                 </th>
+                                {/* VOCABULÁRIO: DATA */}
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Data</th>
-                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Descrição</th>
+                                {/* VOCABULÁRIO: CATEGORIA / DESCRIÇÃO */}
+                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Descrição / Categoria</th>
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Valor</th>
                                 <th className="px-6 py-3 text-right text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {filteredIncomes.length === 0 ? (
-                                <tr><td colSpan={5} className="p-12 text-center text-zinc-500 text-xs">Nenhuma receita encontrada.</td></tr>
+                                <tr><td colSpan={5} className="p-12 text-center text-zinc-500 text-xs">Nenhum lançamento encontrado.</td></tr>
                             ) : (
                                 filteredIncomes.map((inc) => {
                                     const isSelected = selectedIds.includes(inc.id)
@@ -352,10 +370,11 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
            <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-zinc-500">
               <div className="flex items-center gap-2">
                 <ListFilter size={14} />
-                <span>Exibindo <strong className="text-zinc-300">{filteredIncomes.length}</strong> itens</span>
+                {/* VOCABULÁRIO: LANÇAMENTOS */}
+                <span>Exibindo <strong className="text-zinc-300">{filteredIncomes.length}</strong> Lançamentos</span>
               </div>
               <div className="hidden sm:block">
-                 {selectedYear === -1 ? 'Todos' : selectedYear}
+                 {selectedYear === -1 ? 'Todos os Períodos' : `Período: ${selectedYear}`}
               </div>
            </div>
         </div>

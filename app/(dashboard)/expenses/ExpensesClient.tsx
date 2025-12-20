@@ -21,7 +21,7 @@ const pillBaseClass = "inline-flex items-center justify-center rounded-md px-2 p
 const cardClass = "card relative p-5 flex flex-col justify-between h-32 md:h-40"
 const iconBadgeClass = "absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-rose-400"
 
-// Utilitário para converter Hex para RGBA (transparência)
+// Utilitário para converter Hex para RGBA
 const hexToRgba = (hex: string, alpha: number) => {
     const cleanHex = hex.replace('#', '');
     const r = parseInt(cleanHex.substring(0, 2), 16);
@@ -55,7 +55,7 @@ export default function ExpensesClient({
   const router = useRouter()
   const supabase = createClient()
 
-  // Estados Locais (Filtros e UI)
+  // Estados Locais
   const [searchTerm, setSearchTerm] = useState('')      
   const [filterStatus, setFilterStatus] = useState('todos') 
   const [filterType, setFilterType] = useState('todos')     
@@ -77,7 +77,6 @@ export default function ExpensesClient({
   const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
   const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 1 + i)
 
-  // Fecha menu ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -88,12 +87,10 @@ export default function ExpensesClient({
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Atualiza URL ao mudar filtros de data
   function handleFilterChange(month: number, year: number) {
     router.push(`/expenses?month=${month}&year=${year}`)
   }
 
-  // Filtragem local
   const filteredExpenses = initialExpenses.filter(expense => {
     const matchStatus = filterStatus === 'todos' ? true : expense.status === filterStatus
     const matchType = filterType === 'todos' ? true : expense.type === filterType
@@ -114,8 +111,7 @@ export default function ExpensesClient({
     else setSelectedIds([...selectedIds, id])
   }
 
-  // --- LÓGICA DE CRUD ---
-
+  // --- CRUD FUNCTIONS (Mantidas iguais, focando na UI abaixo) ---
   async function handleSaveExpense(data: CreateExpenseDTO & { recurrence_months?: number }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -132,7 +128,6 @@ export default function ExpensesClient({
           is_credit_card: data.is_credit_card 
         })
       } else {
-        // Lógica de Recorrência (fixa)
         const { data: parentData, error } = await supabase.from('expenses').insert({ 
           user_id: user.id, 
           name: data.name, 
@@ -152,12 +147,7 @@ export default function ExpensesClient({
         
         for (let i = 1; i < monthsCount; i++) {
           const d = new Date(data.date)
-          // Avança mês a mês preservando o dia (com ajuste para fim de mês)
           d.setMonth(d.getMonth() + i)
-          
-          // Correção básica de dia 31 pular para dia 1
-          // (Idealmente isso iria para o backend também no futuro)
-          
           futureExpenses.push({ 
             user_id: user.id, 
             name: data.name, 
@@ -181,14 +171,14 @@ export default function ExpensesClient({
 
   async function handleDeleteSelected() {
     if (selectedIds.length === 0) return
-    if (!confirm(`Excluir ${selectedIds.length} itens?`)) return 
+    if (!confirm(`Excluir ${selectedIds.length} lançamentos?`)) return 
 
     const { error } = await supabase.from('expenses').delete().in('id', selectedIds)
     
     if (error) {
       addToast("Erro ao excluir: " + error.message, 'error')
     } else {
-      addToast(`${selectedIds.length} itens excluídos`, 'success')
+      addToast(`${selectedIds.length} lançamentos excluídos`, 'success')
       setSelectedIds([])
       router.refresh()
     }
@@ -199,17 +189,14 @@ export default function ExpensesClient({
     const { error } = await supabase.from('expenses').delete().eq('id', id)
     if (error) addToast("Erro ao excluir", 'error')
     else {
-        addToast("Item excluído", 'success')
+        addToast("Lançamento excluído", 'success')
         router.refresh()
     }
   }
 
   async function handleToggleStatus(id: string, currentStatus: string) {
     const newStatus = currentStatus === 'pendente' ? 'pago' : 'pendente'
-    
-    // Otimista: atualiza UI antes (opcional, mas aqui vamos esperar refresh para garantir consistência)
     const { error } = await supabase.from('expenses').update({ status: newStatus }).eq('id', id)
-    
     if (error) {
       addToast("Erro ao atualizar status", 'error')
     } else {
@@ -262,13 +249,14 @@ export default function ExpensesClient({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Lançamentos</h1>
-            <p className="text-zinc-400 mt-1 text-sm">Gerencie suas despesas e faturas</p>
+            <p className="text-zinc-400 mt-1 text-sm">Gerencie suas <strong className="text-zinc-300">Movimentações</strong></p>
           </div>
           <div className="flex items-center gap-4">
              <div className="bg-zinc-900 border border-white/5 flex items-center p-1 rounded-lg">
                 <div className="flex items-center gap-2 px-3 border-r border-white/5">
                    <Calendar size={14} className="text-rose-400"/>
-                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Filtro</span>
+                   {/* VOCABULÁRIO: PERÍODO */}
+                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Período</span>
                 </div>
                 <select value={selectedMonth} onChange={(e) => handleFilterChange(parseInt(e.target.value), selectedYear)} className="bg-transparent text-zinc-300 text-xs font-medium py-1.5 px-2 cursor-pointer outline-none [&>option]:bg-zinc-900">
                    <option value={-1}>Mês</option>
@@ -286,34 +274,36 @@ export default function ExpensesClient({
           </div>
         </div>
 
-        {/* CARDS DE RESUMO */}
+        {/* CARDS DE RESUMO (KPIs) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={cardClass}>
                 <div>
+                    {/* VOCABULÁRIO: DESPESAS */}
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
-                        {searchTerm ? 'Busca' : 'Total Visível'}
+                        {searchTerm ? 'Busca' : 'Despesas'}
                     </p>
                     <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(currentTableTotal)}</h3>
                 </div>
                 <div className={iconBadgeClass}><DollarSign size={18} /></div>
                 <div className="mt-auto">
                     <span className="text-[10px] text-rose-400 font-medium bg-rose-500/10 px-2 py-1 rounded">
-                        Despesa Consolidada
+                        Total do Período
                     </span>
                 </div>
             </div>
 
             <div className={cardClass}>
                 <div>
+                    {/* VOCABULÁRIO: FLUXO FINANCEIRO */}
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
-                        Acumulado {selectedYear === -1 ? new Date().getFullYear() : selectedYear}
+                        Fluxo Financeiro
                     </p>
                     <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(kpiData.totalYear)}</h3>
                 </div>
                 <div className={iconBadgeClass}><TrendingDown size={18} /></div>
                 <div className="mt-auto">
                     <span className="text-[10px] text-zinc-500">
-                        Soma anual filtrada
+                        Acumulado ({selectedYear === -1 ? new Date().getFullYear() : selectedYear})
                     </span>
                 </div>
             </div>
@@ -333,7 +323,8 @@ export default function ExpensesClient({
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    <h3 className="text-base font-bold text-white">Histórico</h3>
+                    {/* VOCABULÁRIO: MOVIMENTAÇÕES */}
+                    <h3 className="text-base font-bold text-white">Movimentações</h3>
                     {selectedIds.length > 0 && (
                         <button 
                             onClick={handleDeleteSelected}
@@ -361,7 +352,7 @@ export default function ExpensesClient({
                             type="text" 
                             value={searchTerm} 
                             onChange={(e) => setSearchTerm(e.target.value)} 
-                            placeholder="Buscar..." 
+                            placeholder="Filtrar Lançamentos..." 
                             className="w-full rounded-lg border border-white/5 bg-zinc-900 py-1.5 pl-9 pr-3 text-xs text-white focus:ring-1 focus:ring-rose-500 outline-none"
                         />
                     </div>
@@ -382,8 +373,10 @@ export default function ExpensesClient({
                                         )}
                                     </button>
                                 </th>
-                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Vencimento</th>
-                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Descrição</th>
+                                {/* VOCABULÁRIO: DATA */}
+                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Data</th>
+                                {/* VOCABULÁRIO: CATEGORIA */}
+                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Categoria</th>
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Valor</th>
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-3 text-right text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ações</th>
@@ -391,7 +384,7 @@ export default function ExpensesClient({
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {filteredExpenses.length === 0 ? (
-                                <tr><td colSpan={6} className="p-12 text-center text-zinc-500 text-xs">Vazio.</td></tr>
+                                <tr><td colSpan={6} className="p-12 text-center text-zinc-500 text-xs">Nenhum lançamento no período.</td></tr>
                             ) : (
                                 filteredExpenses.map((expense) => {
                                     const badgeColor = accountsMap[expense.name] || '#71717a'
@@ -476,10 +469,11 @@ export default function ExpensesClient({
            <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-zinc-500">
               <div className="flex items-center gap-2">
                 <ListFilter size={14} />
-                <span>Exibindo <strong className="text-zinc-300">{filteredExpenses.length}</strong> itens</span>
+                {/* VOCABULÁRIO: LANÇAMENTOS */}
+                <span>Exibindo <strong className="text-zinc-300">{filteredExpenses.length}</strong> Lançamentos</span>
               </div>
               <div className="hidden sm:block">
-                 {selectedYear === -1 ? 'Todos' : selectedYear}
+                 {selectedYear === -1 ? 'Todos os períodos' : `Período: ${selectedYear}`}
               </div>
            </div>
         </div>
@@ -495,7 +489,7 @@ export default function ExpensesClient({
           onClose={() => setSelectedCardId(null)}
           expenseId={selectedCardId || ''}
           expenseName={selectedCardName}
-          onUpdateTotal={() => router.refresh()} // Atualiza server component
+          onUpdateTotal={() => router.refresh()} 
         />
 
         <UpgradeModal 
