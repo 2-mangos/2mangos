@@ -1,7 +1,6 @@
-// CORREÇÃO: Caminhos ajustados para subir 3 níveis (../../../)
 import { createClient } from '../../../lib/supabase-server'
 import { redirect } from 'next/navigation'
-import IncomesClient from './IncomesClient' // O Client continua na mesma pasta, então é ./
+import IncomesClient from './IncomesClient'
 import { Income } from '../../../lib/types'
 
 export default async function IncomesPage({ searchParams }: { searchParams: Promise<{ month?: string, year?: string }> }) {
@@ -11,12 +10,11 @@ export default async function IncomesPage({ searchParams }: { searchParams: Prom
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) { redirect('/login') }
 
-  // 1. Definição de Datas (Filtro Atual)
+  // 1. Definição de Datas (Filtro)
   const today = new Date()
   const selectedMonth = params.month ? parseInt(params.month) : today.getMonth()
   const selectedYear = params.year ? parseInt(params.year) : today.getFullYear()
 
-  // Lógica de datas
   let startDate: string
   let endDate: string
 
@@ -33,7 +31,7 @@ export default async function IncomesPage({ searchParams }: { searchParams: Prom
       }
   }
 
-  // 2. Query Principal
+  // 2. Query de Lançamentos (Tabela)
   const { data: incomesData } = await supabase
     .from('incomes')
     .select('*')
@@ -43,9 +41,9 @@ export default async function IncomesPage({ searchParams }: { searchParams: Prom
     .order('date', { ascending: true })
 
   const incomes = (incomesData as Income[]) || []
-  const totalSelected = incomes.reduce((acc, curr) => acc + curr.amount, 0)
 
-  // 3. Query para KPI Anual
+  // 3. Query KPI Anual (Fluxo Financeiro)
+  // Sempre pega o ano selecionado (ou atual se for 'Todos') para mostrar o acumulado do ano
   const kpiYear = selectedYear === -1 ? today.getFullYear() : selectedYear
   const kpiStart = `${kpiYear}-01-01`
   const kpiEnd = `${kpiYear}-12-31`
@@ -59,20 +57,19 @@ export default async function IncomesPage({ searchParams }: { searchParams: Prom
 
   const totalYear = yearData ? yearData.reduce((acc, curr) => acc + curr.amount, 0) : 0
   
-  // Cálculo da Média Mensal
+  // Média Mensal
   let divisor = 12
   if (kpiYear === today.getFullYear()) {
       divisor = today.getMonth() + 1
   }
   const monthlyAverage = totalYear / divisor
 
-  // 4. Renderizar Cliente
   return (
     <div className="min-h-screen p-8 pb-32">
       <div className="mx-auto max-w-6xl">
         <IncomesClient 
             initialIncomes={incomes}
-            kpiData={{ totalSelected, totalYear, monthlyAverage }}
+            kpiData={{ totalYear, monthlyAverage }}
             selectedMonth={selectedMonth}
             selectedYear={selectedYear}
         />

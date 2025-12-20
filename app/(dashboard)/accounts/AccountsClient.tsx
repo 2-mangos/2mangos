@@ -28,52 +28,37 @@ const COLORS = [
   { hex: '#6366f1', name: 'Indigo' }, { hex: '#6b7280', name: 'Cinza' } 
 ]
 
-// Lista Expandida de Ícones
+// Lista Expandida de Ícones (Mantida Original)
 const AVAILABLE_ICONS: { id: string, icon: LucideIcon, label: string }[] = [
-    // Finanças
     { id: 'wallet', icon: Wallet, label: 'Carteira' },
     { id: 'bank', icon: Landmark, label: 'Banco' },
     { id: 'card', icon: CreditCard, label: 'Cartão' },
     { id: 'piggy', icon: PiggyBank, label: 'Economia' },
-    
-    // Essenciais
     { id: 'home', icon: Home, label: 'Casa' },
     { id: 'food', icon: Utensils, label: 'Alimentação' },
     { id: 'coffee', icon: Coffee, label: 'Café/Lanches' },
     { id: 'shopping', icon: ShoppingBag, label: 'Compras' },
     { id: 'shirt', icon: Shirt, label: 'Vestuário' },
-    
-    // Contas
     { id: 'light', icon: Lightbulb, label: 'Luz' },
     { id: 'water', icon: Droplets, label: 'Água' },
     { id: 'phone', icon: Smartphone, label: 'Celular' },
     { id: 'wifi', icon: Wifi, label: 'Internet' },
     { id: 'fix', icon: Wrench, label: 'Serviços' },
-
-    // Transporte
     { id: 'car', icon: Car, label: 'Carro' },
     { id: 'fuel', icon: Fuel, label: 'Combustível' },
     { id: 'bus', icon: Bus, label: 'Transporte Pub.' },
     { id: 'travel', icon: Plane, label: 'Viagem' },
-
-    // Saúde e Bem-estar
     { id: 'health', icon: Stethoscope, label: 'Saúde' },
     { id: 'gym', icon: Dumbbell, label: 'Academia' },
-    
-    // Pessoal / Família
     { id: 'education', icon: GraduationCap, label: 'Estudos' },
     { id: 'work', icon: Briefcase, label: 'Trabalho' },
     { id: 'baby', icon: Baby, label: 'Crianças' },
     { id: 'pet', icon: PawPrint, label: 'Pets' },
-
-    // Lazer
     { id: 'leisure', icon: Gamepad2, label: 'Lazer' },
     { id: 'tv', icon: Tv, label: 'Streaming' },
     { id: 'music', icon: Music, label: 'Música' },
     { id: 'gift', icon: Gift, label: 'Presente' },
 ]
-
-// --- COMPONENTES AUXILIARES ---
 
 const AccountIconDisplay = ({ iconId, size = 20, className = "" }: { iconId?: string, size?: number, className?: string }) => {
     const iconObj = AVAILABLE_ICONS.find(i => i.id === iconId) || AVAILABLE_ICONS[0]
@@ -117,7 +102,7 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                     <GripVertical size={18} />
                 </div>
                 
-                {/* ÍCONE REDONDO */}
+                {/* ÍCONE */}
                 <div 
                     className="h-10 w-10 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 border border-white/10 relative overflow-hidden" 
                     style={{ backgroundColor: account.color || '#3b82f6' }}
@@ -131,7 +116,7 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                 <div className="flex flex-col min-w-0">
                     <span className="font-bold text-zinc-200 text-sm truncate">{account.name}</span>
                     
-                    {/* ÁREA DE BADGES */}
+                    {/* BADGES */}
                     <div className="flex items-center gap-2 mt-1">
                         {account.is_credit_card && (
                             <>
@@ -289,14 +274,14 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
 
     if (error) addToast("Erro: " + error.message, 'error')
     else {
-        addToast(editingAccount ? "Atualizado com sucesso!" : "Conta criada com sucesso!", 'success')
+        addToast(editingAccount ? "Atualizado com sucesso!" : "Categoria criada com sucesso!", 'success')
         setIsModalOpen(false)
         router.refresh()
     }
   }
 
   async function handleDelete(id: string) { 
-    if (!confirm('Atenção: Isso excluirá todas as despesas vinculadas a esta conta. Continuar?')) return
+    if (!confirm('Atenção: Isso excluirá todas as movimentações e lançamentos vinculados a esta conta. Continuar?')) return
     const { error } = await supabase.from('accounts').delete().eq('id', id)
     if (error) addToast("Erro ao excluir conta", 'error')
     else {
@@ -314,10 +299,10 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-4 border-b border-white/5">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Contas & Categorias</h1>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Categorias</h1>
             <p className="text-zinc-400 mt-1 text-sm flex items-center gap-2">
                 <Layers size={14} className="text-indigo-400"/>
-                Organize de onde sai o seu dinheiro
+                Gerencie suas categorias
             </p>
           </div>
           
@@ -328,7 +313,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                     type="text" 
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)} 
-                    placeholder="Buscar conta..." 
+                    placeholder="Filtrar" 
                     className="w-full rounded-lg border border-white/10 bg-zinc-900/50 py-2.5 pl-10 pr-4 text-sm text-white focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-zinc-600"
                 />
              </div>
@@ -337,7 +322,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                 onClick={openNewModal} 
                 className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/20 text-sm font-bold transition-all active:scale-95 whitespace-nowrap"
              >
-                <Plus size={18}/> <span className="hidden sm:inline">Nova Conta</span>
+                <Plus size={18}/> <span className="hidden sm:inline">Nova</span>
              </button>
           </div>
         </div>
@@ -349,8 +334,10 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                   <div className="bg-zinc-900 p-4 rounded-full mb-4 ring-1 ring-white/10">
                     <Tag size={32} className="text-zinc-600"/>
                   </div>
-                  <h3 className="text-zinc-300 font-bold mb-1">Nenhuma conta encontrada</h3>
-                  <p className="text-zinc-500 text-sm max-w-xs mb-4">Cadastre seus bancos, cartões ou carteiras para começar a organizar.</p>
+                  {/* VOCABULÁRIO: CONTA */}
+                  <h3 className="text-zinc-300 font-bold mb-1">Nenhuma Conta encontrada</h3>
+                  {/* VOCABULÁRIO: LANÇAMENTOS */}
+                  <p className="text-zinc-500 text-sm max-w-xs mb-4">Cadastre seus bancos, cartões ou carteiras para organizar seus <strong className="text-zinc-400">Lançamentos</strong>.</p>
                   <button onClick={openNewModal} className="text-indigo-400 text-sm font-bold hover:underline hover:text-indigo-300">
                     Criar minha primeira conta
                   </button>
@@ -387,7 +374,8 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                         {editingAccount ? <Edit3 size={18} className="text-indigo-400"/> : <Plus size={18} className="text-indigo-400"/>}
                         {editingAccount ? 'Editar Conta' : 'Nova Conta'}
                     </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">Personalize a identidade da sua conta.</p>
+                    {/* VOCABULÁRIO: CATEGORIA */}
+                    <p className="text-xs text-zinc-500 mt-0.5">Defina os detalhes da sua <strong className="text-zinc-400">Conta</strong>.</p>
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-full transition-colors"><X size={18} /></button>
             </div>
@@ -396,7 +384,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
               
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                   <Tag size={12}/> Nome
+                   <Tag size={12}/> Nome da Conta
                 </label>
                 <input 
                     autoFocus 
@@ -404,7 +392,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                     type="text" 
                     value={formData.name} 
                     onChange={(e) => setFormData({...formData, name: e.target.value})} 
-                    placeholder="Ex: Nubank, Carteira..." 
+                    placeholder="Ex: Nubank, Carteira, Alimentação..." 
                     className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3.5 text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500/50 outline-none placeholder:text-zinc-700 text-sm transition-all"
                 />
               </div>
@@ -495,8 +483,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                         <span className={`text-sm font-bold block mb-0.5 ${formData.is_credit_card ? 'text-white' : 'text-zinc-300'}`}>
                             Cartão de Crédito
                         </span>
+                        {/* VOCABULÁRIO: MEIO DE CRÉDITO */}
                         <span className="text-[11px] text-zinc-500 leading-tight block">
-                            Habilita gestão de faturas e limites.
+                            Habilita funções de fatura e limites deste <strong className="text-zinc-400">Meio de Crédito</strong>.
                         </span>
                     </div>
                     <div className={`
@@ -533,7 +522,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                     Cancelar
                   </button>
                   <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 font-bold shadow-lg shadow-indigo-900/20 transition-all active:scale-95 text-sm flex items-center justify-center gap-2 group">
-                    {editingAccount ? 'Salvar Alterações' : 'Criar Conta'} <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform"/>
+                    {editingAccount ? 'Salvar Alterações' : 'Criar'} <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform"/>
                   </button>
               </div>
             </form>

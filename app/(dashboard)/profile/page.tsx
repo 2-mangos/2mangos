@@ -1,52 +1,34 @@
 'use client'
 
 import { createClient } from '../../../lib/supabase'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  User, LogOut, Shield, Lock, Save, 
-  Camera, AlertTriangle, Edit2, Eye, EyeOff, Check, X, Crown, Settings, Trash2 
-} from 'lucide-react' 
+import { User, LogOut, Save, Camera, Edit2, Crown, Loader2, Upload } from 'lucide-react' 
 import { useToast } from '../../../components/ToastContext'
 
 export default function ProfilePage() {
-  const { addToast } = useToast() // Hook de Toast
+  const { addToast } = useToast()
 
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+  const [uploading, setUploading] = useState(false)
   
-  const [formData, setFormData] = useState({ username: '', email: '', full_name: '', phone: '' })
-  const [currency, setCurrency] = useState('BRL')
+  const [formData, setFormData] = useState({ 
+    username: '', 
+    email: '', 
+    full_name: '', 
+    phone: '', 
+    avatar_url: '' 
+  })
   
-  const [passwords, setPasswords] = useState({ new: '', confirm: '' })
-  const [showPassword, setShowPassword] = useState(false)
-  const [passwordStrength, setPasswordStrength] = useState(0)
-  const [loadingPass, setLoadingPass] = useState(false)
   const [loadingSave, setLoadingSave] = useState(false)
 
-  // Estado para confirmação de exclusão (UX melhorada)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [deleteConfirmation, setDeleteConfirmation] = useState('')
-  const [loadingDelete, setLoadingDelete] = useState(false)
-
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => { fetchProfile() }, [])
-
-  const passwordRequirements = [
-    { label: "Mínimo 6 caracteres", met: passwords.new.length >= 6 },
-    { label: "Pelo menos um número", met: /[0-9]/.test(passwords.new) },
-    { label: "Letra maiúscula", met: /[A-Z]/.test(passwords.new) },
-  ]
-
-  useEffect(() => {
-    const metCount = passwordRequirements.filter(r => r.met).length
-    setPasswordStrength(metCount)
-  }, [passwords.new])
-
-  const passwordsMatch = passwords.new && passwords.confirm && passwords.new === passwords.confirm
 
   async function fetchProfile() {
     setLoading(true)
@@ -61,11 +43,80 @@ export default function ProfilePage() {
         username: data.username || '', 
         email: data.email || '', 
         full_name: data.full_name || '', 
-        phone: data.phone || '' 
+        phone: data.phone || '',
+        avatar_url: data.avatar_url || ''
       })
-      setCurrency(data.currency || 'BRL')
     }
     setLoading(false)
+  }
+
+  // --- LÓGICA DE UPLOAD DE IMAGEM ---
+  async function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    try {
+      setUploading(true)
+      const file = event.target.files?.[0]
+      
+      if (!file) return
+
+      // 1. Validação de Tamanho (Max 2MB)
+      const fileSizeInMB = file.size / 1024 / 1024
+      if (fileSizeInMB > 2) {
+        addToast("A imagem deve ter no máximo 2MB.", 'error')
+        return
+      }
+
+      // 2. Validação de Tipo
+      if (!file.type.startsWith('image/')) {
+        addToast("Apenas arquivos de imagem são permitidos.", 'error')
+        return
+      }
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${profile.id}-${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      // 3. Upload para o Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // 4. Obter URL Pública
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      const publicUrl = urlData.publicUrl
+
+      // 5. Atualizar Tabela de Usuários
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id)
+
+      if (updateError) throw updateError
+
+      // 6. Atualizar Estado Local
+      setFormData((prev: any) => ({ ...prev, avatar_url: publicUrl }))
+      setProfile((prev: any) => ({ ...prev, avatar_url: publicUrl }))
+      
+      addToast("Foto de perfil atualizada!", 'success')
+      
+      // AVISAR O HEADER PARA ATUALIZAR
+      window.dispatchEvent(new Event('profile-updated'))
+      
+      router.refresh() 
+
+    } catch (error: any) {
+      addToast("Erro no upload: " + error.message, 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click()
   }
 
   async function handleSaveAll() {
@@ -76,7 +127,6 @@ export default function ProfilePage() {
       full_name: formData.full_name,
       username: formData.username,
       phone: formData.phone,
-      currency: currency,
       updated_at: new Date().toISOString(),
     }
 
@@ -88,45 +138,13 @@ export default function ProfilePage() {
       setProfile({ ...profile, ...updates })
       setIsEditing(false)
       addToast("Perfil atualizado com sucesso!", 'success')
-      router.refresh() // MELHORIA UX: Atualiza sem recarregar a página toda
+      
+      // AVISAR O HEADER PARA ATUALIZAR (Caso mude o nome)
+      window.dispatchEvent(new Event('profile-updated'))
+      
+      router.refresh()
     }
     setLoadingSave(false)
-  }
-
-  async function handleChangePassword() {
-    if (!passwords.new) return addToast("Digite a nova senha.", 'info')
-    if (passwords.new !== passwords.confirm) return addToast("As senhas não conferem.", 'error')
-    
-    setLoadingPass(true)
-    const { error } = await supabase.auth.updateUser({ password: passwords.new })
-
-    if (error) { 
-        addToast("Erro: " + error.message, 'error') 
-    } else {
-      addToast("Senha atualizada com segurança!", 'success')
-      setPasswords({ new: '', confirm: '' })
-    }
-    setLoadingPass(false)
-  }
-
-  async function handleDeleteAccount() {
-    // MELHORIA UX: Validação integrada em vez de prompt()
-    if (deleteConfirmation !== 'ENCERRAR') {
-        addToast("Digite ENCERRAR para confirmar.", 'error')
-        return
-    }
-
-    setLoadingDelete(true)
-    const { error } = await supabase.from('users').delete().eq('id', profile.id)
-    
-    if (error) { 
-        addToast("Erro ao deletar conta: " + error.message, 'error')
-        setLoadingDelete(false)
-    } else {
-      await supabase.auth.signOut()
-      addToast("Conta encerrada. Até logo.", 'info')
-      router.push('/login')
-    }
   }
 
   async function handleLogout() {
@@ -145,20 +163,42 @@ export default function ProfilePage() {
     <div className="min-h-screen p-8 pb-32 animate-in fade-in duration-500">
       <div className="mx-auto max-w-3xl space-y-6">
         
-        {/* CABEÇALHO */}
+        {/* CABEÇALHO COM UPLOAD */}
         <div className="card rounded-2xl p-8 flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
-          <div className="relative">
-            <div className="h-24 w-24 rounded-full bg-indigo-600 flex items-center justify-center text-3xl font-bold text-white shadow-xl ring-4 ring-zinc-950">
-              {getInitials()}
+          
+          <div className="relative group cursor-pointer" onClick={triggerFileInput}>
+            <div className="h-24 w-24 rounded-full bg-indigo-600 flex items-center justify-center text-3xl font-bold text-white shadow-xl ring-4 ring-zinc-950 overflow-hidden relative">
+              {uploading ? (
+                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                    <Loader2 size={24} className="animate-spin text-white" />
+                 </div>
+              ) : formData.avatar_url ? (
+                 <img src={formData.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                 getInitials()
+              )}
+              
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                 <Camera size={20} className="text-white" />
+              </div>
             </div>
-            <div className="absolute bottom-0 right-0 bg-zinc-800 p-1.5 rounded-full border border-white/10 text-zinc-400 shadow-sm">
-               <Camera size={16} />
+
+            <div className="absolute bottom-0 right-0 bg-zinc-800 p-1.5 rounded-full border border-white/10 text-zinc-400 shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+               <Upload size={14} />
             </div>
+
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImageUpload} 
+                accept="image/png, image/jpeg, image/webp" 
+                className="hidden" 
+            />
           </div>
           
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-white">{formData.full_name || 'Usuário'}</h1>
-            <p className="text-zinc-400">Minha Conta</p>
+            <p className="text-zinc-400">@{formData.username}</p>
             
             {profile?.plano === 'premium' ? (
                 <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
@@ -179,7 +219,7 @@ export default function ProfilePage() {
         {/* DADOS PESSOAIS */}
         <div className="card rounded-2xl p-8 relative">
             {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="absolute top-6 right-6 p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-full transition-colors">
+                <button onClick={() => setIsEditing(true)} className="absolute top-6 right-6 p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-full transition-colors" title="Editar Perfil">
                     <Edit2 size={20} />
                 </button>
             )}
@@ -215,45 +255,8 @@ export default function ProfilePage() {
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-zinc-500 uppercase mb-2">E-mail</label>
-                    {isEditing ? (
-                         <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"/>
-                    ) : (
-                        <p className="text-zinc-300 font-medium text-sm py-2 border-b border-white/5">{formData.email}</p>
-                    )}
-                </div>
-            </div>
-        </div>
-
-        {/* PREFERÊNCIAS */}
-        <div className="card rounded-2xl p-8 relative">
-            {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="absolute top-6 right-6 p-2 text-zinc-500 hover:text-white hover:bg-white/5 rounded-full transition-colors">
-                    <Edit2 size={20} />
-                </button>
-            )}
-
-            <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                <Settings size={20} className="text-indigo-500"/> Preferências do Sistema
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                <div>
-                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-2">Moeda Principal</label>
-                    <p className="text-xs text-zinc-400 mb-3">A moeda padrão para exibição dos valores.</p>
-                     {isEditing ? (
-                        <select 
-                            value={currency} 
-                            onChange={e => setCurrency(e.target.value)} 
-                            className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
-                        >
-                            <option value="BRL">Real (BRL)</option>
-                            <option value="USD">Dólar (USD)</option>
-                            <option value="EUR">Euro (EUR)</option>
-                        </select>
-                    ) : (
-                        <p className="text-zinc-300 font-medium text-sm py-2 border-b border-white/5">{currency === 'BRL' ? 'Real (BRL)' : currency}</p>
-                    )}
+                    {/* Email não editável para segurança simples */}
+                    <p className="text-zinc-300 font-medium text-sm py-2 border-b border-white/5 opacity-70 cursor-not-allowed" title="Não é possível alterar o e-mail">{formData.email}</p>
                 </div>
             </div>
 
@@ -265,154 +268,6 @@ export default function ProfilePage() {
                     </button>
                 </div>
             )}
-        </div>
-
-        {/* SEGURANÇA */}
-        <div className="card rounded-2xl p-8">
-            <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                <Shield size={20} className="text-indigo-500"/> Segurança
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-5">
-                    <div>
-                        <label className="block text-xs font-bold text-zinc-500 uppercase mb-2">Nova Senha</label>
-                        <div className="relative">
-                            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"/>
-                            <input 
-                                type={showPassword ? "text" : "password"} 
-                                value={passwords.new}
-                                onChange={e => setPasswords({...passwords, new: e.target.value})}
-                                className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 pl-10 pr-10 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-zinc-600 transition-all"
-                                placeholder="••••••"
-                            />
-                            <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors">
-                                {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-zinc-500 uppercase mb-2">Confirmar Senha</label>
-                        <div className="relative">
-                            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"/>
-                            <input 
-                                type="password" 
-                                value={passwords.confirm}
-                                onChange={e => setPasswords({...passwords, confirm: e.target.value})}
-                                className={`w-full rounded-xl border bg-zinc-950 p-3 pl-10 text-sm text-white focus:ring-2 outline-none placeholder:text-zinc-600 transition-all ${
-                                    passwords.confirm && !passwordsMatch ? 'border-red-500/50 focus:ring-red-500' : 
-                                    passwords.confirm && passwordsMatch ? 'border-emerald-500/50 focus:ring-emerald-500' : 
-                                    'border-white/10 focus:ring-indigo-500'
-                                }`}
-                                placeholder="••••••"
-                            />
-                            {passwords.confirm && (
-                                <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${passwordsMatch ? 'text-emerald-500' : 'text-red-500'}`}>
-                                    {passwordsMatch ? <Check size={16}/> : <X size={16}/>}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    
-                    <button 
-                        onClick={handleChangePassword}
-                        disabled={loadingPass || !passwords.new || !passwordsMatch || passwordStrength < 3}
-                        className="w-full py-3 bg-indigo-600 text-white hover:bg-indigo-500 rounded-xl text-sm font-bold transition-all shadow-lg shadow-indigo-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-4"
-                    >
-                        {loadingPass ? 'Atualizando...' : 'Atualizar Senha'}
-                    </button>
-                </div>
-
-                <div className="bg-white/5 rounded-xl p-5 border border-white/5 h-fit">
-                    <h3 className="text-sm font-bold text-white mb-4">Requisitos da Senha</h3>
-                    <div className="mb-4">
-                        <div className="flex justify-between text-xs font-bold text-zinc-400 mb-1.5 uppercase">
-                            <span>Força</span>
-                            <span className={
-                                passwordStrength === 3 ? "text-emerald-400" :
-                                passwordStrength === 2 ? "text-yellow-400" :
-                                "text-red-400"
-                            }>
-                                {passwordStrength === 0 ? "Vazia" :
-                                 passwordStrength === 1 ? "Fraca" :
-                                 passwordStrength === 2 ? "Média" : "Forte"}
-                            </span>
-                        </div>
-                        <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden flex gap-1">
-                            <div className={`h-full flex-1 rounded-full transition-colors duration-300 ${passwordStrength >= 1 ? 'bg-red-500' : 'bg-white/10'}`}></div>
-                            <div className={`h-full flex-1 rounded-full transition-colors duration-300 ${passwordStrength >= 2 ? 'bg-yellow-500' : 'bg-white/10'}`}></div>
-                            <div className={`h-full flex-1 rounded-full transition-colors duration-300 ${passwordStrength >= 3 ? 'bg-emerald-500' : 'bg-white/10'}`}></div>
-                        </div>
-                    </div>
-                    <ul className="space-y-3">
-                        {passwordRequirements.map((req, idx) => (
-                            <li key={idx} className={`flex items-center gap-3 text-xs font-medium transition-colors duration-200 ${req.met ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${req.met ? 'bg-emerald-500/20 border-emerald-500/30' : 'border-white/10 bg-white/5'}`}>
-                                    {req.met && <Check size={12} strokeWidth={3}/>}
-                                </div>
-                                {req.label}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        {/* ZONA DE PERIGO (UX CORRIGIDA) */}
-        <div className={`card rounded-2xl p-8 relative overflow-hidden transition-all duration-300 ${isDeleting ? 'border-red-500/50 bg-red-500/5' : 'border-red-500/20 hover:border-red-500/40'}`}>
-            <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
-            
-            <div className="flex flex-col sm:flex-row items-start gap-6">
-                <div className="p-4 bg-red-500/10 rounded-full text-red-500 shrink-0">
-                    <AlertTriangle size={24} />
-                </div>
-                
-                <div className="flex-1 w-full">
-                    <h2 className="text-lg font-bold text-white mb-1">Encerrar conta</h2>
-                    <p className="text-sm text-zinc-400 mb-4">
-                        Esta ação é irreversível. Todos os seus dados serão apagados permanentemente.
-                    </p>
-
-                    {isDeleting ? (
-                        <div className="animate-in fade-in slide-in-from-top-2">
-                             <label className="block text-xs font-bold text-red-400 uppercase mb-2">
-                                Para confirmar, digite <span className="select-all bg-red-500/20 px-1 rounded">ENCERRAR</span> abaixo:
-                             </label>
-                             <div className="flex gap-3">
-                                <input 
-                                    autoFocus
-                                    type="text" 
-                                    value={deleteConfirmation}
-                                    onChange={(e) => setDeleteConfirmation(e.target.value)}
-                                    className="flex-1 rounded-xl border border-red-500/30 bg-zinc-950 p-2.5 text-sm text-white focus:ring-2 focus:ring-red-500 outline-none placeholder:text-zinc-700"
-                                    placeholder="ENCERRAR"
-                                />
-                                <button
-                                    onClick={handleDeleteAccount}
-                                    disabled={deleteConfirmation !== 'ENCERRAR' || loadingDelete}
-                                    className="px-4 py-2.5 bg-red-600 text-white hover:bg-red-700 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-900/20"
-                                >
-                                    {loadingDelete ? 'Apagando...' : 'Confirmar Exclusão'}
-                                </button>
-                                <button
-                                    onClick={() => { setIsDeleting(false); setDeleteConfirmation('') }}
-                                    className="px-4 py-2.5 border border-white/10 text-zinc-400 hover:text-white rounded-xl text-sm font-bold transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                             </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setIsDeleting(true)}
-                            className="px-5 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all whitespace-nowrap flex items-center gap-2"
-                        >
-                            <Trash2 size={16}/> Encerrar Conta
-                        </button>
-                    )}
-                </div>
-            </div>
         </div>
 
       </div>

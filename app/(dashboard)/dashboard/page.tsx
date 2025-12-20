@@ -24,18 +24,16 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     { data: lastExpenses },
     { data: currentIncomes },
     { data: yearlyBalances }, 
-    { data: accountsData }, // Alterado para pegar limites
+    { data: accountsData },
     { data: nextExpenseData }
   ] = await Promise.all([
     supabase.from('users').select('plano, full_name, username').eq('id', user.id).single(),
-    supabase.from('expenses').select('id, value, date, name, is_credit_card').eq('user_id', user.id).gte('date', startCurrentDate).lte('date', endCurrentDate),
+    // ADICIONADO 'type' NO SELECT ABAIXO
+    supabase.from('expenses').select('id, value, date, name, is_credit_card, type').eq('user_id', user.id).gte('date', startCurrentDate).lte('date', endCurrentDate),
     supabase.from('expenses').select('value').eq('user_id', user.id).gte('date', startLastDate).lte('date', endLastDate),
     supabase.from('incomes').select('amount').eq('user_id', user.id).gte('date', startCurrentDate).lte('date', endCurrentDate),
     supabase.rpc('get_monthly_balances', { year_input: selectedYear }),
-    
-    // Agora busca limites também
     supabase.from('accounts').select('name, credit_limit, is_credit_card').eq('user_id', user.id).order('name'),
-
     supabase.from('expenses').select('name, date, value').eq('user_id', user.id).eq('status', 'pendente').gte('date', new Date().toISOString().split('T')[0]).order('date', { ascending: true }).limit(1).single()
   ])
 
@@ -43,6 +41,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const sumLast = lastExpenses?.reduce((acc, curr) => acc + curr.value, 0) || 0
   const totalIncome = currentIncomes?.reduce((acc, curr) => acc + curr.amount, 0) || 0
   
+  // CÁLCULO DE FIXAS vs VARIÁVEIS
+  const fixedTotal = currentExpenses?.filter((e: any) => e.type === 'fixa').reduce((acc, curr) => acc + curr.value, 0) || 0
+  const variableTotal = currentExpenses?.filter((e: any) => e.type === 'variavel').reduce((acc, curr) => acc + curr.value, 0) || 0
+
   const percentageChange = sumLast === 0 ? (sumCurrent > 0 ? 100 : 0) : ((sumCurrent - sumLast) / sumLast) * 100
   
   const highestExpense = currentExpenses && currentExpenses.length > 0
@@ -83,7 +85,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   const accountNames = accountsData ? accountsData.map(a => a.name) : []
 
-  // CALCULAR LIMITE TOTAL
   const totalCreditLimit = accountsData
     ?.filter(a => a.is_credit_card)
     .reduce((acc, curr) => acc + (curr.credit_limit || 0), 0) || 0
@@ -101,7 +102,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     ccTotal,
     ccTransactions,
     accountNames,
-    totalCreditLimit // <--- Novo dado
+    totalCreditLimit,
+    // NOVO CAMPO
+    expenseTypeBreakdown: { fixed: fixedTotal, variable: variableTotal }
   }
 
   let displayName = 'Usuário'
