@@ -2,13 +2,14 @@
 
 import { useRouter } from 'next/navigation'
 import { 
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
-  CartesianGrid, Legend, Cell, AreaChart, Area, PieChart, Pie
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
+  CartesianGrid, Legend, Cell, AreaChart, Area, PieChart, Pie, BarChart, Bar
 } from 'recharts'
 import { 
   TrendingUp, TrendingDown, DollarSign, Wallet, 
   AlertTriangle, Lightbulb, Activity, Lock, 
-  ArrowLeft, Zap, ChevronRight, ChevronDown, CreditCard, Sparkles 
+  ArrowLeft, Zap, ChevronRight, ChevronDown, CreditCard,
+  CalendarClock, AlertCircle, Target // Ícones
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../lib/utils'
 import { useState, useEffect, useMemo, useTransition } from 'react'
@@ -18,9 +19,7 @@ import { getAccountYearlyData } from '../../actions/dashboard-data'
 const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 1 + i)
 
-// Cores Gerais
 const colors = { red: '#f43f5e', green: '#10b981', yellow: '#f59e0b', indigo: '#6366f1', slate: '#3f3f46' }
-
 const cardClassBase = "card relative flex flex-col justify-between"
 const iconBadgeClass = "absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 text-indigo-400 border border-white/5"
 
@@ -34,17 +33,31 @@ interface DashboardProps {
     healthScore: number
     chartData: any[]
     topCategories: any[]
+    allCategorySpends: { name: string, value: number }[]
+    accountsList: any[]
     ccCategoryData: any[]
     ccTotal: number
     ccTransactions: any[]
     accountNames: string[]
     totalCreditLimit: number
-    expenseTypeBreakdown: { fixed: number, variable: number }
+    expenseTypeBreakdown: { 
+        fixed: number, 
+        variable: number, 
+        topFixed: {name: string, value: number}[], 
+        topVariable: {name: string, value: number}[] 
+    }
   }
   userProfile: { name: string, plan: string }
   selectedMonth: number
   selectedYear: number
 }
+
+const InsightBar = ({ text }: { text: string }) => (
+  <div className="flex items-center gap-2 bg-indigo-500/10 p-2.5 rounded-lg border border-indigo-500/20 backdrop-blur-sm animate-in fade-in">
+      <Lightbulb size={14} className="text-indigo-400 shrink-0" />
+      <p className="text-[10px] font-medium text-indigo-100 leading-tight line-clamp-2">{text}</p>
+  </div>
+)
 
 export default function DashboardClient({ data, userProfile, selectedMonth, selectedYear }: DashboardProps) {
   const router = useRouter()
@@ -55,8 +68,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   const [isPending, startTransition] = useTransition()
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [selectedCcCategory, setSelectedCcCategory] = useState<string | null>(null)
-
-  // VOCABULÁRIO: Resultado (antigo Saldo)
+  
   const currentResult = data.totalIncome - data.currentMonthTotal
   const isSpendingMore = data.percentageChange > 0
   const activeCreditLimit = data.totalCreditLimit > 0 ? data.totalCreditLimit : 0;
@@ -70,19 +82,38 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
       return '#a5b4fc'
   }
 
-  // Dados para o Gráfico de Pizza
+  // --- LÓGICA DE METAS (BUDGETS) ---
+  const activeBudgets = useMemo(() => {
+    return data.accountsList
+        .filter(acc => acc.monthly_budget && acc.monthly_budget > 0 && !acc.is_credit_card)
+        .map(acc => {
+            const spend = data.allCategorySpends.find(c => c.name === acc.name)?.value || 0
+            const percent = (spend / acc.monthly_budget) * 100
+            const isOver = spend > acc.monthly_budget
+            
+            return {
+                name: acc.name,
+                budget: acc.monthly_budget,
+                spend,
+                percent,
+                isOver,
+                color: acc.color
+            }
+        })
+        .sort((a, b) => b.percent - a.percent) 
+  }, [data.accountsList, data.allCategorySpends])
+  // ---------------------------------
+
   const expenseTypeData = [
     { name: 'Fixas', value: data.expenseTypeBreakdown.fixed },
     { name: 'Variáveis', value: data.expenseTypeBreakdown.variable },
   ].filter(d => d.value > 0)
 
-  const COLORS_PIE = ['#6366f1', '#a5b4fc']
+  const COLORS_PIE = ['#6366f1', '#10b981']
 
-  // --- INSIGHTS (VOCABULÁRIO ATUALIZADO) ---
   const expensesInsight = useMemo(() => {
     let deficitStreak = 0;
     const activeMonths = data.chartData.filter(d => d.expense > 0 || d.income > 0).slice(-3);
-    
     activeMonths.forEach(m => { if (m.expense > m.income) deficitStreak++; });
 
     if (deficitStreak >= 3) return "Alerta: Há 3 meses suas despesas superam as receitas.";
@@ -109,9 +140,9 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     if (total === 0) return "Sem dados suficientes.";
     const fixedPercent = (fixed / total) * 100;
     const variablePercent = (variable / total) * 100;
-    if (fixedPercent > 70) return `Alerta: ${fixedPercent.toFixed(0)}% das despesas são fixas.`;
-    if (variablePercent > 60) return `Atenção: Variáveis representam ${variablePercent.toFixed(0)}%.`;
-    return `Perfil: ${fixedPercent.toFixed(0)}% Fixas vs ${variablePercent.toFixed(0)}% Variáveis.`;
+    if (fixedPercent > 70) return `Alerta: ${fixedPercent.toFixed(0)}% das despesas são fixas. Rigidez orçamentária.`;
+    if (variablePercent > 60) return `Atenção: Variáveis são ${variablePercent.toFixed(0)}%. Tente cortar supérfluos.`;
+    return `Equilíbrio: ${fixedPercent.toFixed(0)}% Fixas vs ${variablePercent.toFixed(0)}% Variáveis.`;
   }, [data.expenseTypeBreakdown]);
 
   useEffect(() => {
@@ -167,7 +198,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     }
     if (projection > activeCreditLimit && activeCreditLimit > 0) return `Atenção: Projeção de ${formatCurrency(projection)} pode estourar limite.`
     if (isCurrentMonth && projection > data.ccTotal * 1.2) return `Cuidado: Despesas diárias (${formatCurrency(dailyAvg)}) acima da média.`
-    return "Despesas do cartão sob análise."
+    return "Fatura sob controle. Seus gastos no cartão estão dentro do esperado."
   }, [selectedCcCategory, projection, dailyAvg, data.ccTotal, data.ccCategoryData, activeCreditLimit, isCurrentMonth])
 
   let scoreTextColor = 'text-red-400', scoreLabel = 'Crítico', scoreDesc = 'Despesas excedendo Receitas.'
@@ -184,7 +215,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2">
             <p className="text-zinc-400 text-sm">Olá, <strong className="text-zinc-200">{userProfile.name}</strong></p>
             <span className="hidden sm:block text-zinc-600">•</span>
-            {/* VOCABULÁRIO: Resultado */}
             <div className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400/90 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/10">
                <Lightbulb size={10} strokeWidth={3}/> {currentResult < 0 ? 'Resultado negativo.' : 'Resultado positivo.'}
             </div>
@@ -211,7 +241,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
           <div className="flex items-center bg-zinc-900/50 border border-white/5 rounded-lg p-1">
              <div className="relative">
-                {/* VOCABULÁRIO: Período (implícito nos seletores) */}
                 <select value={selectedMonth} onChange={(e) => handleFilterChange(parseInt(e.target.value), selectedYear)} className="bg-transparent text-zinc-300 text-sm font-medium py-1.5 pl-3 pr-2 cursor-pointer hover:text-white outline-none [&>option]:bg-zinc-900">
                   {monthNames.map((m, i) => (<option key={i} value={i}>{m}</option>))}
                 </select>
@@ -231,7 +260,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
         {/* --- COLUNA ESQUERDA (33%) --- */}
         <div className="flex flex-col gap-4">
           
-          {/* 1. DESPESAS (VOCABULÁRIO: Gastos -> Despesas) */}
+          {/* 1. DESPESAS */}
           <div className={`${cardClassBase} h-52 p-5`}>
             <div className="space-y-1">
                 <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Despesas</p>
@@ -243,72 +272,130 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                     <span className="text-zinc-500 font-normal">vs. anterior</span>
                 </div>
             </div>
-            
             <div className="absolute top-5 right-5 w-9 h-9 rounded-lg flex items-center justify-center bg-white/5 text-indigo-400 border border-white/5"><DollarSign size={18} strokeWidth={2} /></div>
-            
             <div className="mt-auto">
-                <div className="flex items-center gap-2 bg-indigo-500/10 p-2 rounded-lg border border-indigo-500/20 backdrop-blur-sm">
-                    <Sparkles size={12} className="text-indigo-400 shrink-0" fill="currentColor" fillOpacity={0.2} />
-                    <p className="text-[10px] font-medium text-indigo-100 leading-tight line-clamp-2">{expensesInsight}</p>
-                </div>
+                <InsightBar text={expensesInsight} />
             </div>
           </div>
 
-          {/* 2. GRÁFICO PIZZA (VOCABULÁRIO: Perfil de Despesas) */}
+          {/* 2. PERFIL DE DESPESAS */}
           <div className="card h-[440px] flex flex-col p-5">
-              <div className="mb-2">
-                  <h3 className="text-base font-semibold text-white">Perfil de Despesas</h3>
-                  <p className="text-xs text-zinc-500">Fixas vs Variáveis</p>
+              <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Perfil de Despesas</h3>
+                    <p className="text-xs text-zinc-500">Onde seu dinheiro está indo</p>
+                  </div>
               </div>
+              
               {expenseTypeData.length > 0 ? (
-                  <div className="flex-1 w-full h-full relative">
-                      <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                              <Pie 
-                                  data={expenseTypeData} 
-                                  cx="50%" 
-                                  cy="50%" 
-                                  innerRadius={70} 
-                                  outerRadius={100} 
-                                  paddingAngle={5} 
-                                  dataKey="value"
-                              >
-                                  {expenseTypeData.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} stroke="rgba(0,0,0,0)" />
-                                  ))}
-                              </Pie>
-                              <Tooltip 
-                                  cursor={{fill: 'transparent'}}
-                                  contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '12px' }} 
-                                  formatter={(value: number) => [formatCurrency(value)]}
-                              />
-                              <Legend 
-                                  verticalAlign="bottom" 
-                                  align="center" 
-                                  iconType="circle" 
-                                  iconSize={10}
-                                  wrapperStyle={{ fontSize: '12px', color: '#a1a1aa', paddingBottom: '20px' }} 
-                              />
-                          </PieChart>
-                      </ResponsiveContainer>
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
-                          <div className="text-center">
-                              <span className="text-[10px] text-zinc-500 uppercase block">Total</span>
-                              <span className="text-lg font-bold text-white">{formatCurrency(data.currentMonthTotal)}</span>
+                  <div className="flex flex-col h-full gap-4">
+                      {/* Gráfico Donut */}
+                      <div className="h-[140px] w-full relative shrink-0">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                  <Pie 
+                                      data={expenseTypeData} cx="50%" cy="50%" innerRadius={45} outerRadius={60} paddingAngle={4} dataKey="value" stroke='none'
+                                  >
+                                      {expenseTypeData.map((entry, index) => (
+                                          <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} />
+                                      ))}
+                                  </Pie>
+                                  <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '12px' }} formatter={(value: number) => [formatCurrency(value)]} />
+                              </PieChart>
+                          </ResponsiveContainer>
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                             <div className="text-center">
+                                 <span className="text-[9px] text-zinc-500 uppercase block font-bold">Total</span>
+                                 <span className="text-sm font-bold text-white">{formatCurrency(data.currentMonthTotal)}</span>
+                             </div>
                           </div>
+                      </div>
+
+                      {/* Lista Detalhada */}
+                      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                          {data.expenseTypeBreakdown.fixed > 0 && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs pb-1 border-b border-white/5">
+                                    <span className="text-indigo-400 font-bold flex items-center gap-1.5 uppercase tracking-wider"><CalendarClock size={12}/> Fixas ({((data.expenseTypeBreakdown.fixed / data.currentMonthTotal) * 100).toFixed(0)}%)</span>
+                                    <span className="text-zinc-300 font-semibold">{formatCurrency(data.expenseTypeBreakdown.fixed)}</span>
+                                </div>
+                                <ul className="space-y-1.5">{data.expenseTypeBreakdown.topFixed.map((item, idx) => (<li key={idx} className="flex justify-between items-center text-[11px] group"><span className="text-zinc-400 truncate max-w-[120px] group-hover:text-zinc-200 transition-colors">{item.name}</span><span className="text-zinc-500 group-hover:text-white transition-colors">{formatCurrency(item.value)}</span></li>))}</ul>
+                            </div>
+                          )}
+                          {data.expenseTypeBreakdown.variable > 0 && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs pb-1 border-b border-white/5">
+                                    <span className="text-emerald-400 font-bold flex items-center gap-1.5 uppercase tracking-wider"><Zap size={12}/> Variáveis ({((data.expenseTypeBreakdown.variable / data.currentMonthTotal) * 100).toFixed(0)}%)</span>
+                                    <span className="text-zinc-300 font-semibold">{formatCurrency(data.expenseTypeBreakdown.variable)}</span>
+                                </div>
+                                <ul className="space-y-1.5">{data.expenseTypeBreakdown.topVariable.map((item, idx) => (<li key={idx} className="flex justify-between items-center text-[11px] group"><span className="text-zinc-400 truncate max-w-[120px] group-hover:text-zinc-200 transition-colors">{item.name}</span><span className="text-zinc-500 group-hover:text-white transition-colors">{formatCurrency(item.value)}</span></li>))}</ul>
+                            </div>
+                          )}
                       </div>
                   </div>
               ) : (
-                  <div className="h-full flex items-center justify-center text-zinc-600 text-sm">Sem dados classificados.</div>
+                  <div className="h-full flex flex-col items-center justify-center text-zinc-600 gap-3">
+                      <AlertCircle size={32} className="opacity-50"/>
+                      <p className="text-xs text-center max-w-[180px]">Classifique suas contas como Fixas ou Variáveis para ver a análise aqui.</p>
+                  </div>
               )}
 
-              <div className="mt-3">
-                  <div className="flex items-center gap-2 bg-indigo-500/10 p-2 rounded-lg border border-indigo-500/20 backdrop-blur-sm">
-                      <Sparkles size={12} className="text-indigo-400 shrink-0" fill="currentColor" fillOpacity={0.2} />
-                      <p className="text-[10px] font-medium text-indigo-100 leading-tight line-clamp-2">{profileInsight}</p>
-                  </div>
+              <div className="mt-auto pt-3">
+                  <InsightBar text={profileInsight} />
               </div>
           </div>
+
+          {/* 3. NOVO CARD: METAS POR CATEGORIA (LISTA) */}
+          {activeBudgets.length > 0 && (
+             <div className="card p-5 flex flex-col max-h-[400px]">
+                <div className="flex items-center justify-between mb-4 shrink-0">
+                    <div>
+                        <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                           <Target size={16} className="text-indigo-400"/> Metas
+                        </h3>
+                        <p className="text-xs text-zinc-500">Orçamento por categoria</p>
+                    </div>
+                </div>
+
+                {/* Cabeçalho da Tabela */}
+                <div className="grid grid-cols-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 px-1 shrink-0">
+                    <span>Categoria</span>
+                    <span className="text-center">Meta</span>
+                    <span className="text-right">Realizado</span>
+                </div>
+                
+                {/* Lista com Scroll */}
+                <div className="overflow-y-auto custom-scrollbar pr-1 space-y-0.5">
+                    {activeBudgets.map((item, idx) => (
+                        <div key={idx} className="grid grid-cols-3 items-center py-2.5 border-b border-white/5 last:border-0 hover:bg-white/5 px-1 rounded-lg transition-colors">
+                            
+                            {/* Coluna 1: Nome */}
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
+                                <span className="text-xs font-medium text-zinc-200 truncate" title={item.name}>{item.name}</span>
+                            </div>
+
+                            {/* Coluna 2: Meta */}
+                            <div className="text-center text-xs text-zinc-400">
+                                {formatCurrency(item.budget)}
+                            </div>
+
+                            {/* Coluna 3: Valor Gasto + Alerta */}
+                            <div className="text-right flex items-center justify-end gap-1.5">
+                                <span className={`text-xs font-bold ${item.isOver ? 'text-red-400' : 'text-emerald-400'}`}>
+                                    {formatCurrency(item.spend)}
+                                </span>
+                                {item.isOver && (
+                                    <Tooltip content="Limite excedido!">
+                                        <AlertCircle size={12} className="text-red-500 animate-pulse" />
+                                    </Tooltip>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+             </div>
+          )}
 
         </div>
 
@@ -316,20 +403,14 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
         <div className="lg:col-span-2 flex flex-col gap-4">
 
           <div className="grid grid-cols-3 gap-3">
-             
-             {/* VOCABULÁRIO: Resultado (antigo Saldo) */}
              <div className={`${cardClassBase} h-28 p-4`}>
                 <div className="space-y-0.5"><p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Resultado</p><h3 className={`text-xl font-bold tracking-tight ${currentResult < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(currentResult)}</h3></div>
                 <div className={iconBadgeClass}><Wallet size={16} strokeWidth={2} /></div>
              </div>
-
-             {/* Maior Despesa (VOCABULÁRIO MANTIDO) */}
              <div className={`${cardClassBase} h-28 p-4`}>
                 <div className="w-full space-y-0.5"><p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Maior despesa</p>{data.highestExpense ? (<><h3 className="text-xs font-semibold text-zinc-200 truncate pr-6" title={data.highestExpense.name}>{data.highestExpense.name}</h3><p className="text-lg font-bold text-zinc-100">{formatCurrency(data.highestExpense.value)}</p></>) : <span className="text-xs text-zinc-600">--</span>}</div>
                 <div className={iconBadgeClass}><AlertTriangle size={16} strokeWidth={2} /></div>
              </div>
-
-             {/* Placeholder */}
              <div className={`${cardClassBase} h-28 border-2 border-dashed border-zinc-800 bg-transparent opacity-50 hover:opacity-100 transition-opacity p-4`}>
                 <div className="flex items-center justify-center w-full h-full">
                   <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Em Breve</span>
@@ -338,11 +419,10 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           </div>
 
           <div className="h-10 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-4 flex items-center justify-start gap-2.5">
-            <Sparkles size={14} className="text-indigo-400 shrink-0" fill="currentColor" fillOpacity={0.2} />
+            <Lightbulb size={14} className="text-indigo-400 shrink-0" />
             <p className="text-[11px] font-medium text-indigo-100 truncate">{miniInsight}</p>
           </div>
 
-          {/* 5. FLUXO FINANCEIRO (VOCABULÁRIO: Fluxo de Caixa -> Fluxo Financeiro) */}
           <div className="card h-[440px] p-5">
             <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div><h3 className="text-base font-semibold text-white">Fluxo Financeiro</h3><p className="text-xs text-zinc-500">Anual ({selectedYear})</p></div>
@@ -473,16 +553,14 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
              )}
            </div>
 
-           <div className="mt-auto bg-zinc-800/20 border border-white/5 rounded-xl p-3 flex gap-3 items-start animate-in fade-in">
-              <div className={`p-1.5 rounded-md shrink-0 ${selectedCcCategory ? 'bg-indigo-500/20 text-indigo-400' : 'bg-yellow-500/10 text-yellow-500'}`}>{selectedCcCategory ? <Zap size={14}/> : <AlertTriangle size={14}/>}</div>
-              <div><p className="text-[11px] text-zinc-300 leading-snug font-medium line-clamp-2">{dynamicInsightText}</p></div>
+           <div className="mt-auto">
+              <InsightBar text={dynamicInsightText} />
            </div>
            
         </div>
 
         <div className="w-full md:w-[60%] p-6 flex flex-col h-full bg-zinc-900/10">
            <div className="flex justify-between items-center mb-4">
-              {/* VOCABULÁRIO: Lançamentos (antigo Extrato da Fatura) */}
               <div><h3 className="text-base font-semibold text-white">Lançamentos da Fatura</h3><p className="text-xs text-zinc-500">Últimas movimentações</p></div>
               {selectedCcCategory && (
                 <button onClick={() => setSelectedCcCategory(null)} className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 hover:text-white bg-white/5 px-2 py-1 rounded transition-colors"><ArrowLeft size={10}/> VOLTAR</button>

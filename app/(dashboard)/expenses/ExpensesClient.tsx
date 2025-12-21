@@ -6,14 +6,13 @@ import { useRouter } from 'next/navigation'
 import { 
   MoreVertical, Edit2, Trash2, Save, X, Search, CreditCard, 
   Plus, Calendar, DollarSign, TrendingDown, Wallet, ListFilter, 
-  SquareCheck, Square 
+  SquareCheck, Square, Repeat, AlertCircle, ArrowRight
 } from 'lucide-react'
 import NewExpenseModal from '../../../components/NewExpenseModal'
 import CreditCardModal from '../../../components/CreditCardModal'
 import UpgradeModal from '../../../components/UpgradeModal'
 import { useToast } from '../../../components/ToastContext'
 
-// Importando Tipos e Utils
 import { Expense, CreateExpenseDTO } from '../../../lib/types'
 import { formatCurrency, formatDate } from '../../../lib/utils'
 
@@ -21,7 +20,6 @@ const pillBaseClass = "inline-flex items-center justify-center rounded-md px-2 p
 const cardClass = "card relative p-5 flex flex-col justify-between h-32 md:h-40"
 const iconBadgeClass = "absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-rose-400"
 
-// Utilitário para converter Hex para RGBA
 const hexToRgba = (hex: string, alpha: number) => {
     const cleanHex = hex.replace('#', '');
     const r = parseInt(cleanHex.substring(0, 2), 16);
@@ -32,10 +30,7 @@ const hexToRgba = (hex: string, alpha: number) => {
 
 interface ExpensesClientProps {
   initialExpenses: Expense[]
-  kpiData: {
-    totalYear: number
-    monthlyAverage: number
-  }
+  kpiData: { totalYear: number, monthlyAverage: number }
   accountsMap: Record<string, string>
   userPlan: string
   selectedMonth: number
@@ -43,12 +38,7 @@ interface ExpensesClientProps {
 }
 
 export default function ExpensesClient({ 
-  initialExpenses, 
-  kpiData, 
-  accountsMap, 
-  userPlan, 
-  selectedMonth, 
-  selectedYear 
+  initialExpenses, kpiData, accountsMap, userPlan, selectedMonth, selectedYear 
 }: ExpensesClientProps) {
   
   const { addToast } = useToast()
@@ -66,6 +56,10 @@ export default function ExpensesClient({
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [selectedCardName, setSelectedCardName] = useState('')
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  
+  // --- NOVO: ESTADO PARA O MODAL DE RECORRÊNCIA ---
+  const [recurrenceModalOpen, setRecurrenceModalOpen] = useState(false)
+  const [pendingSaveId, setPendingSaveId] = useState<string | null>(null)
 
   // Estados de Edição/Menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -100,7 +94,6 @@ export default function ExpensesClient({
 
   const currentTableTotal = filteredExpenses.reduce((acc, curr) => acc + (curr.value || 0), 0)
 
-  // --- LÓGICA DE SELEÇÃO ---
   function handleSelectAll() {
     if (selectedIds.length === filteredExpenses.length) setSelectedIds([])
     else setSelectedIds(filteredExpenses.map(e => e.id))
@@ -111,7 +104,6 @@ export default function ExpensesClient({
     else setSelectedIds([...selectedIds, id])
   }
 
-  // --- CRUD FUNCTIONS (Mantidas iguais, focando na UI abaixo) ---
   async function handleSaveExpense(data: CreateExpenseDTO & { recurrence_months?: number }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -174,7 +166,6 @@ export default function ExpensesClient({
     if (!confirm(`Excluir ${selectedIds.length} lançamentos?`)) return 
 
     const { error } = await supabase.from('expenses').delete().in('id', selectedIds)
-    
     if (error) {
       addToast("Erro ao excluir: " + error.message, 'error')
     } else {
@@ -197,9 +188,8 @@ export default function ExpensesClient({
   async function handleToggleStatus(id: string, currentStatus: string) {
     const newStatus = currentStatus === 'pendente' ? 'pago' : 'pendente'
     const { error } = await supabase.from('expenses').update({ status: newStatus }).eq('id', id)
-    if (error) {
-      addToast("Erro ao atualizar status", 'error')
-    } else {
+    if (error) addToast("Erro ao atualizar status", 'error')
+    else {
       addToast(`Status alterado para ${newStatus}`, 'success')
       router.refresh()
     }
@@ -214,17 +204,73 @@ export default function ExpensesClient({
     setOpenMenuId(null) 
   }
 
-  async function handleSaveEdit(id: string) {
-    const { error } = await supabase
-      .from('expenses')
-      .update({ date: editValues.date, value: parseFloat(editValues.value) })
-      .eq('id', id)
+  // --- NOVA LÓGICA DE SALVAR ---
+  async function handleRequestSave(id: string) {
+      const expense = initialExpenses.find(e => e.id === id)
+      
+      // Se for fixa, pergunta como salvar
+      if (expense && expense.type === 'fixa') {
+          setPendingSaveId(id)
+          setRecurrenceModalOpen(true)
+      } else {
+          // Se for variável, salva direto
+          await executeSave(id, 'single')
+      }
+  }
+
+  async function executeSave(id: string, mode: 'single' | 'future') {
+    const newValue = parseFloat(editValues.value)
+    const newDate = editValues.date
+
+    let error = null
+
+    if (mode === 'single') {
+        // Atualiza apenas este registro (Data e Valor)
+        const { error: err } = await supabase
+            .from('expenses')
+            .update({ date: newDate, value: newValue })
+            .eq('id', id)
+        error = err
+    } else {
+        // MODO "THIS AND FUTURE"
+        // 1. Identificar o grupo (Parent ID ou o próprio ID se for o pai)
+        const expense = initialExpenses.find(e => e.id === id)
+        if (!expense) return
+
+        const groupId = expense.parent_id || expense.id
+        
+        // 2. Atualiza o registro ATUAL (Data e Valor)
+        const { error: err1 } = await supabase
+            .from('expenses')
+            .update({ date: newDate, value: newValue })
+            .eq('id', id)
+        
+        if (err1) {
+            error = err1
+        } else {
+            // 3. Atualiza os FUTUROS (Apenas o VALOR, para não bagunçar as datas dos outros meses)
+            // Busca todos que pertencem ao grupo e têm data maior que a data original do registro editado
+            const originalDate = expense.date
+            
+            const { error: err2 } = await supabase
+                .from('expenses')
+                .update({ value: newValue }) // Propaga apenas o valor novo
+                .or(`id.eq.${groupId},parent_id.eq.${groupId}`) // Pertence ao grupo
+                .gt('date', originalDate) // É futuro em relação ao editado
+                .neq('id', id) // Não é o que já editamos
+
+            error = err2
+        }
+    }
 
     if (error) {
       addToast("Erro ao atualizar: " + error.message, 'error')
     } else { 
-      addToast("Lançamento atualizado!", 'success')
-      setEditingId(null) 
+      const msg = mode === 'future' ? "Recorrência atualizada com sucesso!" : "Lançamento atualizado!"
+      addToast(msg, 'success')
+      setEditingId(null)
+      setRecurrenceModalOpen(false)
+      setPendingSaveId(null)
       router.refresh()
     }
   }
@@ -255,7 +301,6 @@ export default function ExpensesClient({
              <div className="bg-zinc-900 border border-white/5 flex items-center p-1 rounded-lg">
                 <div className="flex items-center gap-2 px-3 border-r border-white/5">
                    <Calendar size={14} className="text-rose-400"/>
-                   {/* VOCABULÁRIO: PERÍODO */}
                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Período</span>
                 </div>
                 <select value={selectedMonth} onChange={(e) => handleFilterChange(parseInt(e.target.value), selectedYear)} className="bg-transparent text-zinc-300 text-xs font-medium py-1.5 px-2 cursor-pointer outline-none [&>option]:bg-zinc-900">
@@ -278,7 +323,6 @@ export default function ExpensesClient({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={cardClass}>
                 <div>
-                    {/* VOCABULÁRIO: DESPESAS */}
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
                         {searchTerm ? 'Busca' : 'Despesas'}
                     </p>
@@ -294,7 +338,6 @@ export default function ExpensesClient({
 
             <div className={cardClass}>
                 <div>
-                    {/* VOCABULÁRIO: FLUXO FINANCEIRO */}
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
                         Fluxo Financeiro
                     </p>
@@ -323,7 +366,6 @@ export default function ExpensesClient({
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    {/* VOCABULÁRIO: MOVIMENTAÇÕES */}
                     <h3 className="text-base font-bold text-white">Movimentações</h3>
                     {selectedIds.length > 0 && (
                         <button 
@@ -373,9 +415,7 @@ export default function ExpensesClient({
                                         )}
                                     </button>
                                 </th>
-                                {/* VOCABULÁRIO: DATA */}
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Data</th>
-                                {/* VOCABULÁRIO: CATEGORIA */}
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Categoria</th>
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Valor</th>
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Status</th>
@@ -419,7 +459,10 @@ export default function ExpensesClient({
                                                     {expense.is_credit_card && <CreditCard size={10} className="mr-1.5 opacity-80"/>}
                                                     {expense.name}
                                                 </span>
-                                                {expense.type === 'fixa' && <span className={`${pillBaseClass} bg-blue-500/10 text-blue-400 border-blue-500/20`}>Fixa</span>}
+                                                {expense.type === 'fixa' 
+                                                    ? <span className={`${pillBaseClass} bg-blue-500/10 text-blue-400 border-blue-500/20`}>Fixa</span>
+                                                    : <span className={`${pillBaseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>Variável</span>
+                                                }
                                             </div>
                                         </td>
 
@@ -440,7 +483,7 @@ export default function ExpensesClient({
                                         <td className="px-6 py-3 text-right text-xs font-medium relative">
                                             {editingId === expense.id ? (
                                                 <div className="flex justify-end gap-1">
-                                                    <button onClick={() => handleSaveEdit(expense.id)} className="text-emerald-400 hover:bg-emerald-500/10 p-1 rounded"><Save size={14}/></button>
+                                                    <button onClick={() => handleRequestSave(expense.id)} className="text-emerald-400 hover:bg-emerald-500/10 p-1 rounded"><Save size={14}/></button>
                                                     <button onClick={() => setEditingId(null)} className="text-red-400 hover:bg-red-500/10 p-1 rounded"><X size={14}/></button>
                                                 </div>
                                             ) : (
@@ -469,7 +512,6 @@ export default function ExpensesClient({
            <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-zinc-500">
               <div className="flex items-center gap-2">
                 <ListFilter size={14} />
-                {/* VOCABULÁRIO: LANÇAMENTOS */}
                 <span>Exibindo <strong className="text-zinc-300">{filteredExpenses.length}</strong> Lançamentos</span>
               </div>
               <div className="hidden sm:block">
@@ -477,6 +519,49 @@ export default function ExpensesClient({
               </div>
            </div>
         </div>
+
+        {/* MODAL DE CONFIRMAÇÃO DE RECORRÊNCIA */}
+        {recurrenceModalOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 shadow-2xl p-6 space-y-4">
+                    <div className="flex items-start gap-4">
+                        <div className="bg-blue-500/10 p-3 rounded-full text-blue-400">
+                            <Repeat size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-white">Editar Recorrência</h3>
+                            <p className="text-sm text-zinc-400 mt-1">
+                                Esta é uma despesa fixa. Como deseja aplicar as alterações?
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                        <button 
+                            onClick={() => pendingSaveId && executeSave(pendingSaveId, 'single')}
+                            className="w-full p-4 rounded-xl bg-zinc-800 border border-white/5 hover:border-indigo-500/50 hover:bg-zinc-800/80 text-left transition-all group"
+                        >
+                            <span className="block text-sm font-bold text-white mb-0.5">Apenas este lançamento</span>
+                            <span className="block text-xs text-zinc-500">Altera somente o mês atual.</span>
+                        </button>
+
+                        <button 
+                             onClick={() => pendingSaveId && executeSave(pendingSaveId, 'future')}
+                             className="w-full p-4 rounded-xl bg-indigo-600/10 border border-indigo-500/20 hover:bg-indigo-600/20 text-left transition-all group"
+                        >
+                            <span className="block text-sm font-bold text-indigo-200 mb-0.5 flex items-center gap-2">
+                                Este e os próximos <ArrowRight size={14}/>
+                            </span>
+                            <span className="block text-xs text-indigo-300/70">Atualiza o valor deste e de todos os lançamentos futuros.</span>
+                        </button>
+                    </div>
+
+                    <button onClick={() => setRecurrenceModalOpen(false)} className="w-full py-3 text-xs font-bold text-zinc-500 hover:text-white transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        )}
 
         <NewExpenseModal 
           isOpen={isModalOpen} 

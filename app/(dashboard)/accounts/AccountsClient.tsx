@@ -9,7 +9,8 @@ import {
   Landmark, PiggyBank, ShoppingBag, Car, Home, Briefcase, 
   GraduationCap, Utensils, Plane, Gamepad2, Gift, Smartphone, 
   Wrench, Droplets, Lightbulb, LucideIcon, Dumbbell, Stethoscope, 
-  PawPrint, Baby, Shirt, Music, Tv, Wifi, Fuel, Coffee, Bus
+  PawPrint, Baby, Shirt, Music, Tv, Wifi, Fuel, Coffee, Bus,
+  CalendarClock, Zap, Target // Importado Target
 } from 'lucide-react'
 import { useToast } from '../../../components/ToastContext'
 
@@ -28,7 +29,6 @@ const COLORS = [
   { hex: '#6366f1', name: 'Indigo' }, { hex: '#6b7280', name: 'Cinza' } 
 ]
 
-// Lista Expandida de Ícones (Mantida Original)
 const AVAILABLE_ICONS: { id: string, icon: LucideIcon, label: string }[] = [
     { id: 'wallet', icon: Wallet, label: 'Carteira' },
     { id: 'bank', icon: Landmark, label: 'Banco' },
@@ -67,7 +67,7 @@ const AccountIconDisplay = ({ iconId, size = 20, className = "" }: { iconId?: st
 }
 
 interface SortableItemProps {
-  account: Account & { icon?: string }
+  account: Account
   openEditModal: (acc: Account) => void
   handleDelete: (id: string) => void
   openMenuId: string | null
@@ -102,7 +102,6 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                     <GripVertical size={18} />
                 </div>
                 
-                {/* ÍCONE */}
                 <div 
                     className="h-10 w-10 rounded-full flex items-center justify-center text-white shadow-inner shrink-0 border border-white/10 relative overflow-hidden" 
                     style={{ backgroundColor: account.color || '#3b82f6' }}
@@ -116,20 +115,34 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                 <div className="flex flex-col min-w-0">
                     <span className="font-bold text-zinc-200 text-sm truncate">{account.name}</span>
                     
-                    {/* BADGES */}
                     <div className="flex items-center gap-2 mt-1">
-                        {account.is_credit_card && (
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                            account.default_type === 'fixa' 
+                            ? 'text-blue-300 bg-blue-500/10 border-blue-500/20' 
+                            : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
+                        }`}>
+                           {account.default_type === 'fixa' ? <CalendarClock size={10}/> : <Zap size={10}/>}
+                           {account.default_type === 'fixa' ? 'Fixa' : 'Variável'}
+                        </span>
+
+                        {account.is_credit_card ? (
                             <>
                                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
-                                    <CreditCard size={10}/> Cartão de Crédito
+                                    <CreditCard size={10}/> Cartão
                                 </span>
-
                                 {account.credit_limit && account.credit_limit > 0 && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
-                                        Limite: <span className="text-zinc-300">{formatCurrency(account.credit_limit)}</span>
+                                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
+                                        Lim: <span className="text-zinc-300">{formatCurrency(account.credit_limit)}</span>
                                     </span>
                                 )}
                             </>
+                        ) : (
+                             // MOSTRA A META SE NÃO FOR CARTÃO
+                             account.monthly_budget && account.monthly_budget > 0 ? (
+                                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
+                                    Meta: <span className="text-zinc-300">{formatCurrency(account.monthly_budget)}</span>
+                                </span>
+                             ) : null
                         )}
                     </div>
                 </div>
@@ -181,7 +194,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
       is_credit_card: false, 
       color: COLORS[0].hex, 
       credit_limit: '',
-      icon: 'wallet' 
+      monthly_budget: '', // Adicionado campo de meta
+      icon: 'wallet',
+      default_type: 'variavel' as 'fixa' | 'variavel'
   })
   
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -221,7 +236,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         color: acc.color, 
         order_index: index, 
         credit_limit: acc.credit_limit,
-        icon: acc.icon
+        monthly_budget: acc.monthly_budget, // Preserva a meta
+        icon: acc.icon,
+        default_type: acc.default_type
     }))
     await supabase.from('accounts').upsert(updates) 
     router.refresh()
@@ -229,18 +246,28 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
 
   function openNewModal() { 
       setEditingAccount(null)
-      setFormData({ name: '', is_credit_card: false, color: COLORS[0].hex, credit_limit: '', icon: 'wallet' })
+      setFormData({ 
+        name: '', 
+        is_credit_card: false, 
+        color: COLORS[0].hex, 
+        credit_limit: '', 
+        monthly_budget: '', // Reset
+        icon: 'wallet', 
+        default_type: 'variavel' 
+      })
       setIsModalOpen(true) 
   }
   
-  function openEditModal(account: Account & { icon?: string }) { 
+  function openEditModal(account: Account) { 
       setEditingAccount(account)
       setFormData({ 
           name: account.name, 
           is_credit_card: account.is_credit_card, 
           color: account.color || COLORS[0].hex,
           credit_limit: account.credit_limit ? account.credit_limit.toString() : '',
-          icon: account.icon || 'wallet'
+          monthly_budget: account.monthly_budget ? account.monthly_budget.toString() : '', // Carrega valor
+          icon: account.icon || 'wallet',
+          default_type: account.default_type || 'variavel'
       })
       setOpenMenuId(null)
       setIsModalOpen(true) 
@@ -252,13 +279,17 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
     if (!user || !formData.name.trim()) return
 
     const limitValue = formData.is_credit_card && formData.credit_limit ? parseFloat(formData.credit_limit) : 0
+    // Salva a meta se não for cartão (ou se quiser permitir para cartão também, pode remover a restrição)
+    const budgetValue = formData.monthly_budget ? parseFloat(formData.monthly_budget) : 0
 
     const payload = {
         name: formData.name,
         is_credit_card: formData.is_credit_card,
         color: formData.color,
         credit_limit: limitValue,
-        icon: formData.icon
+        monthly_budget: budgetValue, // Salva no banco
+        icon: formData.icon,
+        default_type: formData.default_type
     }
 
     let error = null
@@ -302,7 +333,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
             <h1 className="text-3xl font-bold text-white tracking-tight">Categorias</h1>
             <p className="text-zinc-400 mt-1 text-sm flex items-center gap-2">
                 <Layers size={14} className="text-indigo-400"/>
-                Gerencie suas categorias
+                Gerencie suas categorias e padrões de lançamento
             </p>
           </div>
           
@@ -334,9 +365,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                   <div className="bg-zinc-900 p-4 rounded-full mb-4 ring-1 ring-white/10">
                     <Tag size={32} className="text-zinc-600"/>
                   </div>
-                  {/* VOCABULÁRIO: CONTA */}
                   <h3 className="text-zinc-300 font-bold mb-1">Nenhuma Conta encontrada</h3>
-                  {/* VOCABULÁRIO: LANÇAMENTOS */}
                   <p className="text-zinc-500 text-sm max-w-xs mb-4">Cadastre seus bancos, cartões ou carteiras para organizar seus <strong className="text-zinc-400">Lançamentos</strong>.</p>
                   <button onClick={openNewModal} className="text-indigo-400 text-sm font-bold hover:underline hover:text-indigo-300">
                     Criar minha primeira conta
@@ -363,7 +392,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
           )}
         </div>
 
-      {/* MODAL EDIT/CREATE */}
+      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-zinc-900 rounded-3xl border border-white/10 shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
@@ -374,7 +403,6 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                         {editingAccount ? <Edit3 size={18} className="text-indigo-400"/> : <Plus size={18} className="text-indigo-400"/>}
                         {editingAccount ? 'Editar Conta' : 'Nova Conta'}
                     </h2>
-                    {/* VOCABULÁRIO: CATEGORIA */}
                     <p className="text-xs text-zinc-500 mt-0.5">Defina os detalhes da sua <strong className="text-zinc-400">Conta</strong>.</p>
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-full transition-colors"><X size={18} /></button>
@@ -396,8 +424,70 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                     className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3.5 text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500/50 outline-none placeholder:text-zinc-700 text-sm transition-all"
                 />
               </div>
+              
+              <div className="space-y-3">
+                 <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                   <Zap size={12}/> Tipo Padrão de Lançamento
+                </label>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setFormData({...formData, default_type: 'variavel'})}
+                        className={`
+                           flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2
+                           ${formData.default_type === 'variavel' 
+                             ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' 
+                             : 'bg-zinc-950 border-white/10 text-zinc-500 hover:bg-zinc-900'
+                           }
+                        `}
+                    >
+                        <Zap size={14} /> Variável
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFormData({...formData, default_type: 'fixa'})}
+                        className={`
+                           flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2
+                           ${formData.default_type === 'fixa' 
+                             ? 'bg-blue-500/10 border-blue-500 text-blue-400' 
+                             : 'bg-zinc-950 border-white/10 text-zinc-500 hover:bg-zinc-900'
+                           }
+                        `}
+                    >
+                        <CalendarClock size={14} /> Fixa (Recorrente)
+                    </button>
+                </div>
+              </div>
+              
+              {/* CAMPO DE META OU LIMITE */}
+              <div className="space-y-1.5">
+                 {formData.is_credit_card ? (
+                    // Se for cartão, mostra input de Limite
+                    <></> 
+                 ) : (
+                    // Se NÃO for cartão, mostra Meta de Gastos
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                         <label className="text-[10px] font-bold text-zinc-400 uppercase mb-1.5 ml-1 flex items-center gap-1.5">
+                              <Target size={10}/> Meta de Gasto Mensal (R$)
+                         </label>
+                         <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">R$</span>
+                               <input 
+                                    type="number" 
+                                    step="0.01"
+                                    value={formData.monthly_budget} 
+                                    onChange={(e) => setFormData({...formData, monthly_budget: e.target.value})} 
+                                    placeholder="Ex: 500,00" 
+                                    className="w-full rounded-lg border border-white/10 bg-zinc-950 py-2.5 pl-9 pr-3 text-white focus:ring-1 focus:ring-indigo-500 outline-none text-sm placeholder:text-zinc-700 font-bold"
+                               />
+                         </div>
+                         <p className="text-[10px] text-zinc-500 mt-1">
+                             Defina um teto para acompanhar seus gastos nesta categoria.
+                         </p>
+                    </div>
+                 )}
+              </div>
 
-              {/* SELEÇÃO DE ÍCONE */}
               <div className="space-y-3">
                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                    <GripVertical size={12}/> Ícone
@@ -423,7 +513,6 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                 </div>
               </div>
               
-              {/* SELEÇÃO DE COR */}
               <div className="space-y-3">
                 <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                    <Palette size={12}/> Cor
@@ -463,7 +552,14 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
               </div>
               
               <div 
-                onClick={() => setFormData({...formData, is_credit_card: !formData.is_credit_card})}
+                onClick={() => {
+                    const isNowCard = !formData.is_credit_card
+                    setFormData({
+                        ...formData, 
+                        is_credit_card: isNowCard,
+                        ...(isNowCard ? { default_type: 'variavel' } : {})
+                    })
+                }}
                 className={`
                     relative overflow-hidden cursor-pointer rounded-xl border p-4 transition-all duration-300
                     ${formData.is_credit_card 
@@ -483,7 +579,6 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                         <span className={`text-sm font-bold block mb-0.5 ${formData.is_credit_card ? 'text-white' : 'text-zinc-300'}`}>
                             Cartão de Crédito
                         </span>
-                        {/* VOCABULÁRIO: MEIO DE CRÉDITO */}
                         <span className="text-[11px] text-zinc-500 leading-tight block">
                             Habilita funções de fatura e limites deste <strong className="text-zinc-400">Meio de Crédito</strong>.
                         </span>
@@ -513,6 +608,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                                     className="w-full rounded-lg border border-purple-500/30 bg-black/40 py-2.5 pl-9 pr-3 text-white focus:ring-1 focus:ring-purple-500 outline-none text-sm placeholder:text-zinc-600 font-bold"
                                />
                            </div>
+                           <p className="text-[10px] text-purple-300/60 mt-2 flex items-center gap-1">
+                             <Check size={10} /> Categoria definida automaticamente como <strong>Variável</strong>.
+                           </p>
                       </div>
                   )}
               </div>

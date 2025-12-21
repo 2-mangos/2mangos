@@ -24,13 +24,14 @@ export default function NewExpenseModal({ isOpen, onClose, onSave }: NewExpenseM
 
   const [availableAccounts, setAvailableAccounts] = useState<Account[]>([])
   
-  // Hook de Toast
   const { addToast } = useToast() 
   const supabase = createClient()
 
   useEffect(() => {
     if (isOpen) {
       fetchAccounts()
+      // Resetar form ao abrir
+      setDate(new Date().toISOString().split('T')[0])
     }
   }, [isOpen])
 
@@ -41,11 +42,19 @@ export default function NewExpenseModal({ isOpen, onClose, onSave }: NewExpenseM
     setAvailableAccounts((data as Account[]) || [])
   }
 
+  // --- MUDANÇA AUTOMÁTICA ---
   function handleAccountChange(accountName: string) {
     setName(accountName)
     const account = availableAccounts.find(a => a.name === accountName)
+    
     if (account) {
+      // 1. Define se é cartão
       setIsCreditCard(account.is_credit_card)
+      
+      // 2. Define o tipo automaticamente (Se a conta tiver um padrão definido)
+      if (account.default_type) {
+         setType(account.default_type)
+      }
     }
   }
 
@@ -54,7 +63,6 @@ export default function NewExpenseModal({ isOpen, onClose, onSave }: NewExpenseM
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     
-    // CORREÇÃO: Uso correto da assinatura addToast(string, type)
     if (!name) {
       addToast("Por favor, selecione uma conta ou categoria.", "error")
       return
@@ -71,23 +79,16 @@ export default function NewExpenseModal({ isOpen, onClose, onSave }: NewExpenseM
         status: 'pendente',
         is_credit_card: isCreditCard,
         ...(type === 'fixa' && {
-          recurrence_months: parseInt(recurrence),
+          recurrence_months: recurrence ? parseInt(recurrence) : undefined,
           is_fixed_value: isFixedValue
         })
       }
 
       await onSave(newExpense)
       
-      // Feedback positivo simples
-      // addToast("Lançamento adicionado com sucesso!", "success")
-      // OBS: Removi o toast de sucesso daqui pois o pai (ExpensesClient) já dispara um ao receber o save.
-      // Se duplicar, aparecerão dois. Mantendo apenas reset.
-
       // Resetar Form
       setName('')
       setAmount('')
-      setDate('')
-      setType('variavel')
       setRecurrence('')
       setIsFixedValue(false)
       setIsCreditCard(false)
@@ -101,7 +102,6 @@ export default function NewExpenseModal({ isOpen, onClose, onSave }: NewExpenseM
     }
   }
 
-  // ... (RESTANTE DO CÓDIGO JSX MANTIDO IGUAL AO ANTERIOR) ...
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="w-full max-w-md bg-zinc-900 rounded-2xl shadow-2xl p-6 border border-white/10 animate-in fade-in zoom-in-95">
@@ -151,7 +151,7 @@ export default function NewExpenseModal({ isOpen, onClose, onSave }: NewExpenseM
             <div className="rounded-xl bg-blue-500/10 p-4 space-y-3 border border-blue-500/20 animate-in fade-in slide-in-from-top-2">
               <div>
                 <label className="block text-xs font-bold text-blue-300 mb-1.5 uppercase">Repetir (Meses)</label>
-                <input required type="number" min="2" max="60" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className="w-full rounded-lg border border-blue-500/30 bg-black/20 p-2 text-sm text-white focus:ring-1 focus:ring-blue-400 outline-none"/>
+                <input required type="number" min="2" max="60" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className="w-full rounded-lg border border-blue-500/30 bg-black/20 p-2 text-sm text-white focus:ring-1 focus:ring-blue-400 outline-none" placeholder="Ex: 12"/>
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="fixedValue" checked={isFixedValue} onChange={(e) => setIsFixedValue(e.target.checked)} className="h-4 w-4 rounded border-blue-500/50 bg-black/20 text-blue-500 focus:ring-blue-500"/>

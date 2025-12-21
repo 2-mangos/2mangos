@@ -24,16 +24,17 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     { data: lastExpenses },
     { data: currentIncomes },
     { data: yearlyBalances }, 
+    // ALTERAÇÃO 1: Buscamos mais campos da conta (budget, icon, color)
     { data: accountsData },
     { data: nextExpenseData }
   ] = await Promise.all([
     supabase.from('users').select('plano, full_name, username').eq('id', user.id).single(),
-    // ADICIONADO 'type' NO SELECT ABAIXO
     supabase.from('expenses').select('id, value, date, name, is_credit_card, type').eq('user_id', user.id).gte('date', startCurrentDate).lte('date', endCurrentDate),
     supabase.from('expenses').select('value').eq('user_id', user.id).gte('date', startLastDate).lte('date', endLastDate),
     supabase.from('incomes').select('amount').eq('user_id', user.id).gte('date', startCurrentDate).lte('date', endCurrentDate),
     supabase.rpc('get_monthly_balances', { year_input: selectedYear }),
-    supabase.from('accounts').select('name, credit_limit, is_credit_card').eq('user_id', user.id).order('name'),
+    // AQUI: Adicionei monthly_budget, color e icon na busca
+    supabase.from('accounts').select('name, credit_limit, is_credit_card, monthly_budget, color, icon').eq('user_id', user.id).order('name'),
     supabase.from('expenses').select('name, date, value').eq('user_id', user.id).eq('status', 'pendente').gte('date', new Date().toISOString().split('T')[0]).order('date', { ascending: true }).limit(1).single()
   ])
 
@@ -41,9 +42,25 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const sumLast = lastExpenses?.reduce((acc, curr) => acc + curr.value, 0) || 0
   const totalIncome = currentIncomes?.reduce((acc, curr) => acc + curr.amount, 0) || 0
   
-  // CÁLCULO DE FIXAS vs VARIÁVEIS
-  const fixedTotal = currentExpenses?.filter((e: any) => e.type === 'fixa').reduce((acc, curr) => acc + curr.value, 0) || 0
-  const variableTotal = currentExpenses?.filter((e: any) => e.type === 'variavel').reduce((acc, curr) => acc + curr.value, 0) || 0
+  const fixedExpenses = currentExpenses?.filter((e: any) => e.type === 'fixa') || []
+  const variableExpenses = currentExpenses?.filter((e: any) => e.type === 'variavel') || []
+
+  const fixedTotal = fixedExpenses.reduce((acc, curr) => acc + curr.value, 0)
+  const variableTotal = variableExpenses.reduce((acc, curr) => acc + curr.value, 0)
+
+  const getTopContributors = (items: any[]) => {
+      const map = new Map<string, number>()
+      items.forEach(item => {
+          map.set(item.name, (map.get(item.name) || 0) + item.value)
+      })
+      return Array.from(map.entries())
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 3) 
+  }
+
+  const topFixedList = getTopContributors(fixedExpenses)
+  const topVariableList = getTopContributors(variableExpenses)
 
   const percentageChange = sumLast === 0 ? (sumCurrent > 0 ? 100 : 0) : ((sumCurrent - sumLast) / sumLast) * 100
   
@@ -68,8 +85,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   const catMap = new Map()
   currentExpenses?.forEach(exp => { catMap.set(exp.name, (catMap.get(exp.name) || 0) + exp.value) })
-  const topCategories = Array.from(catMap.entries())
-    .map(([name, value]) => ({ name, value: value as number, percent: sumCurrent > 0 ? ((value as number) / sumCurrent) * 100 : 0 }))
+  
+  // ALTERAÇÃO 2: Passamos a lista completa de gastos por categoria, não só o TOP 5
+  const allCategorySpends = Array.from(catMap.entries()).map(([name, value]) => ({ name, value: value as number }))
+
+  const topCategories = allCategorySpends
+    .map((item) => ({ ...item, percent: sumCurrent > 0 ? (item.value / sumCurrent) * 100 : 0 }))
     .sort((a, b) => b.value - a.value).slice(0, 5)
 
   const creditExpenseIds = currentExpenses?.filter(e => e.is_credit_card).map(e => e.id) || []
@@ -83,11 +104,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const ccCategoryData = Array.from(ccCatMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => (b.value as number) - (a.value as number))
   const ccTotal = ccTransactions.reduce((acc, curr) => acc + curr.amount, 0)
 
-  const accountNames = accountsData ? accountsData.map(a => a.name) : []
+  // ALTERAÇÃO 3: Passamos os objetos completos de Account
+  const accountsList = accountsData || []
+  const accountNames = accountsList.map(a => a.name)
 
-  const totalCreditLimit = accountsData
-    ?.filter(a => a.is_credit_card)
-    .reduce((acc, curr) => acc + (curr.credit_limit || 0), 0) || 0
+  const totalCreditLimit = accountsList
+    .filter(a => a.is_credit_card)
+    .reduce((acc, curr) => acc + (curr.credit_limit || 0), 0)
 
   const dashboardData = {
     currentMonthTotal: sumCurrent,
@@ -98,13 +121,19 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     healthScore,
     chartData,
     topCategories,
+    allCategorySpends, // Novo campo
+    accountsList,      // Novo campo
     ccCategoryData,
     ccTotal,
     ccTransactions,
     accountNames,
     totalCreditLimit,
-    // NOVO CAMPO
-    expenseTypeBreakdown: { fixed: fixedTotal, variable: variableTotal }
+    expenseTypeBreakdown: { 
+        fixed: fixedTotal, 
+        variable: variableTotal,
+        topFixed: topFixedList,     
+        topVariable: topVariableList 
+    }
   }
 
   let displayName = 'Usuário'
