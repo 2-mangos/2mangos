@@ -10,7 +10,7 @@ import {
   GraduationCap, Utensils, Plane, Gamepad2, Gift, Smartphone, 
   Wrench, Droplets, Lightbulb, LucideIcon, Dumbbell, Stethoscope, 
   PawPrint, Baby, Shirt, Music, Tv, Wifi, Fuel, Coffee, Bus,
-  CalendarClock, Zap, Target // Importado Target
+  CalendarClock, Zap, Target 
 } from 'lucide-react'
 import { useToast } from '../../../components/ToastContext'
 
@@ -115,7 +115,7 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                 <div className="flex flex-col min-w-0">
                     <span className="font-bold text-zinc-200 text-sm truncate">{account.name}</span>
                     
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
                             account.default_type === 'fixa' 
                             ? 'text-blue-300 bg-blue-500/10 border-blue-500/20' 
@@ -125,24 +125,27 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                            {account.default_type === 'fixa' ? 'Fixa' : 'Variável'}
                         </span>
 
-                        {account.is_credit_card ? (
-                            <>
-                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
-                                    <CreditCard size={10}/> Cartão
-                                </span>
-                                {account.credit_limit && account.credit_limit > 0 && (
-                                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
-                                        Lim: <span className="text-zinc-300">{formatCurrency(account.credit_limit)}</span>
-                                    </span>
-                                )}
-                            </>
-                        ) : (
-                             // MOSTRA A META SE NÃO FOR CARTÃO
-                             account.monthly_budget && account.monthly_budget > 0 ? (
-                                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
-                                    Meta: <span className="text-zinc-300">{formatCurrency(account.monthly_budget)}</span>
-                                </span>
-                             ) : null
+                        {/* --- CORREÇÃO E ATUALIZAÇÃO DOS BADGES --- */}
+                        
+                        {/* 1. Badge de Cartão */}
+                        {account.is_credit_card && (
+                             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                                 <CreditCard size={10}/> Cartão
+                             </span>
+                        )}
+
+                        {/* 2. Badge de Limite (só se tiver valor > 0) */}
+                        {account.is_credit_card && (account.credit_limit || 0) > 0 && (
+                             <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
+                                 Lim: <span className="text-zinc-300">{formatCurrency(account.credit_limit)}</span>
+                             </span>
+                        )}
+
+                        {/* 3. Badge de Meta (só se tiver valor > 0). O uso de (val || 0) > 0 previne exibir '0' */}
+                        {(account.monthly_budget || 0) > 0 && (
+                            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
+                                Meta: <span className="text-zinc-300">{formatCurrency(account.monthly_budget)}</span>
+                            </span>
                         )}
                     </div>
                 </div>
@@ -194,7 +197,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
       is_credit_card: false, 
       color: COLORS[0].hex, 
       credit_limit: '',
-      monthly_budget: '', // Adicionado campo de meta
+      monthly_budget: '', 
       icon: 'wallet',
       default_type: 'variavel' as 'fixa' | 'variavel'
   })
@@ -236,7 +239,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         color: acc.color, 
         order_index: index, 
         credit_limit: acc.credit_limit,
-        monthly_budget: acc.monthly_budget, // Preserva a meta
+        monthly_budget: acc.monthly_budget, 
         icon: acc.icon,
         default_type: acc.default_type
     }))
@@ -251,7 +254,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         is_credit_card: false, 
         color: COLORS[0].hex, 
         credit_limit: '', 
-        monthly_budget: '', // Reset
+        monthly_budget: '', 
         icon: 'wallet', 
         default_type: 'variavel' 
       })
@@ -265,7 +268,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
           is_credit_card: account.is_credit_card, 
           color: account.color || COLORS[0].hex,
           credit_limit: account.credit_limit ? account.credit_limit.toString() : '',
-          monthly_budget: account.monthly_budget ? account.monthly_budget.toString() : '', // Carrega valor
+          monthly_budget: account.monthly_budget ? account.monthly_budget.toString() : '',
           icon: account.icon || 'wallet',
           default_type: account.default_type || 'variavel'
       })
@@ -279,7 +282,6 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
     if (!user || !formData.name.trim()) return
 
     const limitValue = formData.is_credit_card && formData.credit_limit ? parseFloat(formData.credit_limit) : 0
-    // Salva a meta se não for cartão (ou se quiser permitir para cartão também, pode remover a restrição)
     const budgetValue = formData.monthly_budget ? parseFloat(formData.monthly_budget) : 0
 
     const payload = {
@@ -287,7 +289,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         is_credit_card: formData.is_credit_card,
         color: formData.color,
         credit_limit: limitValue,
-        monthly_budget: budgetValue, // Salva no banco
+        monthly_budget: budgetValue,
         icon: formData.icon,
         default_type: formData.default_type
     }
@@ -459,33 +461,27 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                 </div>
               </div>
               
-              {/* CAMPO DE META OU LIMITE */}
+              {/* --- ALTERAÇÃO NO FORMULÁRIO: Meta de Gastos SEMPRE disponível --- */}
               <div className="space-y-1.5">
-                 {formData.is_credit_card ? (
-                    // Se for cartão, mostra input de Limite
-                    <></> 
-                 ) : (
-                    // Se NÃO for cartão, mostra Meta de Gastos
-                    <div className="animate-in fade-in slide-in-from-top-2">
-                         <label className="text-[10px] font-bold text-zinc-400 uppercase mb-1.5 ml-1 flex items-center gap-1.5">
-                              <Target size={10}/> Meta de Gasto Mensal (R$)
-                         </label>
-                         <div className="relative">
-                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">R$</span>
-                               <input 
-                                    type="number" 
-                                    step="0.01"
-                                    value={formData.monthly_budget} 
-                                    onChange={(e) => setFormData({...formData, monthly_budget: e.target.value})} 
-                                    placeholder="Ex: 500,00" 
-                                    className="w-full rounded-lg border border-white/10 bg-zinc-950 py-2.5 pl-9 pr-3 text-white focus:ring-1 focus:ring-indigo-500 outline-none text-sm placeholder:text-zinc-700 font-bold"
-                               />
-                         </div>
-                         <p className="text-[10px] text-zinc-500 mt-1">
-                             Defina um teto para acompanhar seus gastos nesta categoria.
-                         </p>
-                    </div>
-                 )}
+                <div className="animate-in fade-in slide-in-from-top-2">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase mb-1.5 ml-1 flex items-center gap-1.5">
+                          <Target size={10}/> Meta de Gasto Mensal (R$)
+                      </label>
+                      <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">R$</span>
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                value={formData.monthly_budget} 
+                                onChange={(e) => setFormData({...formData, monthly_budget: e.target.value})} 
+                                placeholder="Ex: 500,00" 
+                                className="w-full rounded-lg border border-white/10 bg-zinc-950 py-2.5 pl-9 pr-3 text-white focus:ring-1 focus:ring-indigo-500 outline-none text-sm placeholder:text-zinc-700 font-bold"
+                            />
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-1">
+                          Defina um teto para acompanhar seus gastos nesta categoria.
+                      </p>
+                </div>
               </div>
 
               <div className="space-y-3">

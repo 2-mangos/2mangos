@@ -10,7 +10,7 @@ import {
   AlertTriangle, Lightbulb, Activity, Lock, 
   ArrowLeft, Zap, ChevronRight, ChevronDown, CreditCard,
   CalendarClock, AlertCircle, Target, CheckCircle, ArrowUpRight,
-  User, Settings, HelpCircle // Adicionei HelpCircle
+  User, Settings, HelpCircle 
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../lib/utils'
 import { useState, useEffect, useMemo, useTransition } from 'react'
@@ -104,9 +104,10 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
       else { dueText = `Em ${daysUntilDue} dias`; dueColorClass = "text-zinc-400"; }
   }
 
+  // CORREÇÃO AQUI: Removido o filtro '!acc.is_credit_card'
   const activeBudgets = useMemo(() => {
     return data.accountsList
-        .filter(acc => acc.monthly_budget && acc.monthly_budget > 0 && !acc.is_credit_card)
+        .filter(acc => acc.monthly_budget && acc.monthly_budget > 0) // <--- Alterado para incluir cartões
         .map(acc => {
             const spend = data.allCategorySpends.find(c => c.name === acc.name)?.value || 0
             const percent = (spend / acc.monthly_budget) * 100
@@ -118,7 +119,8 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                 spend,
                 percent,
                 isOver,
-                color: acc.color
+                color: acc.color,
+                is_card: acc.is_credit_card // Passando flag para UI se quiser diferenciar
             }
         })
         .sort((a, b) => b.percent - a.percent) 
@@ -399,7 +401,10 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                         <div key={idx} className="grid grid-cols-3 items-center py-2.5 border-b border-white/5 last:border-0 hover:bg-white/5 px-1 rounded-lg transition-colors">
                             <div className="flex items-center gap-2 min-w-0">
                                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
-                                <span className="text-xs font-medium text-zinc-200 truncate" title={item.name}>{item.name}</span>
+                                <span className="text-xs font-medium text-zinc-200 truncate" title={item.name}>
+                                    {item.name}
+                                    {item.is_card && <CreditCard size={10} className="inline ml-1 text-purple-400"/>}
+                                </span>
                             </div>
                             <div className="text-center text-xs text-zinc-400">
                                 {formatCurrency(item.budget)}
