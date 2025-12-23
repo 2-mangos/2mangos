@@ -22,26 +22,44 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     userData,
     { data: currentExpenses },
     { data: lastExpenses },
+    // ALTERAÇÃO 1: Adicionado 'description' na query de incomes
     { data: currentIncomes },
     { data: yearlyBalances }, 
-    // ALTERAÇÃO 1: Buscamos mais campos da conta (budget, icon, color)
     { data: accountsData },
     { data: nextExpenseData }
   ] = await Promise.all([
     supabase.from('users').select('plano, full_name, username').eq('id', user.id).single(),
     supabase.from('expenses').select('id, value, date, name, is_credit_card, type').eq('user_id', user.id).gte('date', startCurrentDate).lte('date', endCurrentDate),
     supabase.from('expenses').select('value').eq('user_id', user.id).gte('date', startLastDate).lte('date', endLastDate),
-    supabase.from('incomes').select('amount').eq('user_id', user.id).gte('date', startCurrentDate).lte('date', endCurrentDate),
+    // AQUI: Buscando description também
+    supabase.from('incomes').select('amount, description').eq('user_id', user.id).gte('date', startCurrentDate).lte('date', endCurrentDate),
     supabase.rpc('get_monthly_balances', { year_input: selectedYear }),
-    // AQUI: Adicionei monthly_budget, color e icon na busca
     supabase.from('accounts').select('name, credit_limit, is_credit_card, monthly_budget, color, icon').eq('user_id', user.id).order('name'),
     supabase.from('expenses').select('name, date, value').eq('user_id', user.id).eq('status', 'pendente').gte('date', new Date().toISOString().split('T')[0]).order('date', { ascending: true }).limit(1).single()
   ])
 
   const sumCurrent = currentExpenses?.reduce((acc, curr) => acc + curr.value, 0) || 0
   const sumLast = lastExpenses?.reduce((acc, curr) => acc + curr.value, 0) || 0
+  
+  // AQUI: Calculando total de receitas
   const totalIncome = currentIncomes?.reduce((acc, curr) => acc + curr.amount, 0) || 0
   
+  // ALTERAÇÃO 2: Processando a origem das receitas
+  const incomeMap = new Map()
+  currentIncomes?.forEach((item: any) => {
+      // Usa a descrição ou "Outros" se estiver vazia
+      const name = item.description || 'Outros'
+      incomeMap.set(name, (incomeMap.get(name) || 0) + item.amount)
+  })
+
+  const incomeSources = Array.from(incomeMap.entries())
+      .map(([name, value]) => ({ 
+          name, 
+          value: value as number,
+          percent: totalIncome > 0 ? ((value as number) / totalIncome) * 100 : 0
+      }))
+      .sort((a, b) => b.value - a.value)
+
   const fixedExpenses = currentExpenses?.filter((e: any) => e.type === 'fixa') || []
   const variableExpenses = currentExpenses?.filter((e: any) => e.type === 'variavel') || []
 
@@ -86,7 +104,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const catMap = new Map()
   currentExpenses?.forEach(exp => { catMap.set(exp.name, (catMap.get(exp.name) || 0) + exp.value) })
   
-  // ALTERAÇÃO 2: Passamos a lista completa de gastos por categoria, não só o TOP 5
   const allCategorySpends = Array.from(catMap.entries()).map(([name, value]) => ({ name, value: value as number }))
 
   const topCategories = allCategorySpends
@@ -104,7 +121,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const ccCategoryData = Array.from(ccCatMap.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => (b.value as number) - (a.value as number))
   const ccTotal = ccTransactions.reduce((acc, curr) => acc + curr.amount, 0)
 
-  // ALTERAÇÃO 3: Passamos os objetos completos de Account
   const accountsList = accountsData || []
   const accountNames = accountsList.map(a => a.name)
 
@@ -118,11 +134,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     highestExpense: highestExpense ? { name: highestExpense.name, value: highestExpense.value } : null,
     nextDue: nextExpenseData,
     totalIncome,
+    // ALTERAÇÃO 3: Passando os dados processados
+    incomeSources, 
     healthScore,
     chartData,
     topCategories,
-    allCategorySpends, // Novo campo
-    accountsList,      // Novo campo
+    allCategorySpends,
+    accountsList,
     ccCategoryData,
     ccTotal,
     ccTransactions,

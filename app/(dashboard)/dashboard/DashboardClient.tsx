@@ -9,7 +9,8 @@ import {
   TrendingUp, TrendingDown, DollarSign, Wallet, 
   AlertTriangle, Lightbulb, Activity, Lock, 
   ArrowLeft, Zap, ChevronRight, ChevronDown, CreditCard,
-  CalendarClock, AlertCircle, Target // Ícones
+  CalendarClock, AlertCircle, Target, CheckCircle, ArrowUpRight,
+  User, Settings, HelpCircle // Adicionei HelpCircle
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../lib/utils'
 import { useState, useEffect, useMemo, useTransition } from 'react'
@@ -30,6 +31,7 @@ interface DashboardProps {
     highestExpense: { name: string, value: number } | null
     nextDue: { name: string, date: string, value: number } | null
     totalIncome: number
+    incomeSources: { name: string, value: number, percent: number }[]
     healthScore: number
     chartData: any[]
     topCategories: any[]
@@ -82,7 +84,26 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
       return '#a5b4fc'
   }
 
-  // --- LÓGICA DE METAS (BUDGETS) ---
+  const daysUntilDue = useMemo(() => {
+    if (!data.nextDue) return null
+    const today = new Date()
+    today.setHours(0,0,0,0)
+    const dueDate = new Date(data.nextDue.date)
+    dueDate.setHours(0,0,0,0)
+    const diffTime = dueDate.getTime() - today.getTime()
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 
+  }, [data.nextDue])
+
+  let dueText = ""
+  let dueColorClass = "text-indigo-400"
+  
+  if (daysUntilDue !== null) {
+      if (daysUntilDue < 0) { dueText = "Atrasado"; dueColorClass = "text-red-500"; }
+      else if (daysUntilDue === 0) { dueText = "Vence hoje"; dueColorClass = "text-yellow-500"; }
+      else if (daysUntilDue === 1) { dueText = "Vence amanhã"; dueColorClass = "text-indigo-400"; }
+      else { dueText = `Em ${daysUntilDue} dias`; dueColorClass = "text-zinc-400"; }
+  }
+
   const activeBudgets = useMemo(() => {
     return data.accountsList
         .filter(acc => acc.monthly_budget && acc.monthly_budget > 0 && !acc.is_credit_card)
@@ -102,7 +123,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
         })
         .sort((a, b) => b.percent - a.percent) 
   }, [data.accountsList, data.allCategorySpends])
-  // ---------------------------------
 
   const expenseTypeData = [
     { name: 'Fixas', value: data.expenseTypeBreakdown.fixed },
@@ -144,6 +164,22 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     if (variablePercent > 60) return `Atenção: Variáveis são ${variablePercent.toFixed(0)}%. Tente cortar supérfluos.`;
     return `Equilíbrio: ${fixedPercent.toFixed(0)}% Fixas vs ${variablePercent.toFixed(0)}% Variáveis.`;
   }, [data.expenseTypeBreakdown]);
+
+  const incomeActionsInsight = useMemo(() => {
+    if (data.incomeSources.length === 0) {
+        return "Dica: Crie lançamentos rapidamente com o botão de atalho para começar a ver análises aqui."
+    }
+    const top = data.incomeSources[0]
+    const second = data.incomeSources[1]
+    
+    if (top.percent > 60) {
+        return `${top.name} é sua principal fonte de renda. Use os atalhos para manter seus registros sempre atualizados.`
+    }
+    if (second) {
+        return `Diversificado! ${top.name} e ${second.name} são suas maiores rendas. Use os atalhos para novos lançamentos.`
+    }
+    return `Você possui ${data.incomeSources.length} fontes de renda identificadas. Use o atalho para agilizar a gestão.`
+  }, [data.incomeSources])
 
   useEffect(() => {
     if (selectedAccount) {
@@ -260,7 +296,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
         {/* --- COLUNA ESQUERDA (33%) --- */}
         <div className="flex flex-col gap-4">
           
-          {/* 1. DESPESAS */}
           <div className={`${cardClassBase} h-52 p-5`}>
             <div className="space-y-1">
                 <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Despesas</p>
@@ -278,7 +313,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
             </div>
           </div>
 
-          {/* 2. PERFIL DE DESPESAS */}
           <div className="card h-[440px] flex flex-col p-5">
               <div className="flex items-start justify-between mb-4">
                   <div>
@@ -289,7 +323,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               
               {expenseTypeData.length > 0 ? (
                   <div className="flex flex-col h-full gap-4">
-                      {/* Gráfico Donut */}
                       <div className="h-[140px] w-full relative shrink-0">
                           <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
@@ -311,7 +344,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                           </div>
                       </div>
 
-                      {/* Lista Detalhada */}
                       <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
                           {data.expenseTypeBreakdown.fixed > 0 && (
                             <div className="space-y-2">
@@ -345,9 +377,8 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               </div>
           </div>
 
-          {/* 3. NOVO CARD: METAS POR CATEGORIA (LISTA) */}
           {activeBudgets.length > 0 && (
-             <div className="card p-5 flex flex-col max-h-[400px]">
+             <div className="card p-5 flex flex-col">
                 <div className="flex items-center justify-between mb-4 shrink-0">
                     <div>
                         <h3 className="text-base font-semibold text-white flex items-center gap-2">
@@ -357,30 +388,22 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                     </div>
                 </div>
 
-                {/* Cabeçalho da Tabela */}
                 <div className="grid grid-cols-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 px-1 shrink-0">
                     <span>Categoria</span>
                     <span className="text-center">Meta</span>
                     <span className="text-right">Realizado</span>
                 </div>
                 
-                {/* Lista com Scroll */}
-                <div className="overflow-y-auto custom-scrollbar pr-1 space-y-0.5">
+                <div className="overflow-y-auto custom-scrollbar pr-1 space-y-0.5 h-[195px]">
                     {activeBudgets.map((item, idx) => (
                         <div key={idx} className="grid grid-cols-3 items-center py-2.5 border-b border-white/5 last:border-0 hover:bg-white/5 px-1 rounded-lg transition-colors">
-                            
-                            {/* Coluna 1: Nome */}
                             <div className="flex items-center gap-2 min-w-0">
                                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
                                 <span className="text-xs font-medium text-zinc-200 truncate" title={item.name}>{item.name}</span>
                             </div>
-
-                            {/* Coluna 2: Meta */}
                             <div className="text-center text-xs text-zinc-400">
                                 {formatCurrency(item.budget)}
                             </div>
-
-                            {/* Coluna 3: Valor Gasto + Alerta */}
                             <div className="text-right flex items-center justify-end gap-1.5">
                                 <span className={`text-xs font-bold ${item.isOver ? 'text-red-400' : 'text-emerald-400'}`}>
                                     {formatCurrency(item.spend)}
@@ -407,15 +430,45 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                 <div className="space-y-0.5"><p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Resultado</p><h3 className={`text-xl font-bold tracking-tight ${currentResult < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(currentResult)}</h3></div>
                 <div className={iconBadgeClass}><Wallet size={16} strokeWidth={2} /></div>
              </div>
+             
              <div className={`${cardClassBase} h-28 p-4`}>
                 <div className="w-full space-y-0.5"><p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Maior despesa</p>{data.highestExpense ? (<><h3 className="text-xs font-semibold text-zinc-200 truncate pr-6" title={data.highestExpense.name}>{data.highestExpense.name}</h3><p className="text-lg font-bold text-zinc-100">{formatCurrency(data.highestExpense.value)}</p></>) : <span className="text-xs text-zinc-600">--</span>}</div>
                 <div className={iconBadgeClass}><AlertTriangle size={16} strokeWidth={2} /></div>
              </div>
-             <div className={`${cardClassBase} h-28 border-2 border-dashed border-zinc-800 bg-transparent opacity-50 hover:opacity-100 transition-opacity p-4`}>
-                <div className="flex items-center justify-center w-full h-full">
-                  <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Em Breve</span>
-                </div>
+             
+             <div className={`${cardClassBase} h-28 p-4`}>
+               {data.nextDue ? (
+                 <>
+                   <div className="w-full space-y-0.5">
+                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                           Próximo Vencimento
+                       </p>
+                       <h3 className="text-xs font-semibold text-zinc-200 truncate pr-6" title={data.nextDue.name}>
+                           {data.nextDue.name}
+                       </h3>
+                       <div className="flex items-baseline gap-1.5">
+                           <p className="text-lg font-bold text-zinc-100">
+                               {formatCurrency(data.nextDue.value)}
+                           </p>
+                       </div>
+                       <p className={`text-[10px] font-medium ${dueColorClass}`}>
+                          {dueText}
+                       </p>
+                   </div>
+                   <div className={`absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/5 ${daysUntilDue !== null && daysUntilDue <= 0 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
+                       <CalendarClock size={16} strokeWidth={2} />
+                   </div>
+                 </>
+               ) : (
+                 <div className="flex flex-col items-center justify-center w-full h-full text-center space-y-1">
+                      <div className="bg-emerald-500/10 p-2 rounded-full text-emerald-500 mb-1">
+                         <CheckCircle size={18} />
+                      </div>
+                      <p className="text-[10px] font-medium text-zinc-400">Tudo pago por agora!</p>
+                 </div>
+               )}
              </div>
+
           </div>
 
           <div className="h-10 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-4 flex items-center justify-start gap-2.5">
@@ -445,6 +498,87 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                     </LineChart>
                 </ResponsiveContainer>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="card p-5 h-[300px] flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                           <ArrowUpRight size={16} className="text-emerald-400"/> Origem das Receitas
+                        </h3>
+                        <p className="text-xs text-zinc-500">Fontes de entrada</p>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">{formatCurrency(data.totalIncome)}</span>
+                  </div>
+                  
+                  {data.incomeSources.length > 0 ? (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-3">
+                        {data.incomeSources.map((source, index) => (
+                           <div key={index} className="group">
+                              <div className="flex justify-between items-center mb-1 text-xs">
+                                <span className="font-medium text-zinc-300 truncate max-w-[120px]" title={source.name}>{source.name}</span>
+                                <span className="font-semibold text-white">{formatCurrency(source.value)}</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full bg-emerald-500 transition-all duration-500" 
+                                    style={{ width: `${source.percent}%`, opacity: Math.max(0.4, source.percent/100) }} 
+                                  />
+                              </div>
+                           </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 gap-2">
+                        <AlertCircle size={24} className="opacity-50"/>
+                        <p className="text-xs">Nenhuma receita lançada.</p>
+                    </div>
+                  )}
+              </div>
+              
+              <div className="card p-5 h-[300px] flex flex-col justify-between">
+                  <div>
+                      <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                          <Zap size={16} className="text-amber-400"/> Ações Rápidas
+                      </h3>
+                      <p className="text-xs text-zinc-500">Atalhos para o dia a dia</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mt-2 h-full">
+                      <button onClick={() => router.push('/expenses')} className="flex flex-col items-center justify-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 hover:border-indigo-500/50 p-3 rounded-xl transition-all group">
+                          <div className="p-2 bg-red-500/10 text-red-400 rounded-lg group-hover:scale-110 transition-transform">
+                              <TrendingDown size={20} />
+                          </div>
+                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white">Nova Despesa</span>
+                      </button>
+
+                      <button onClick={() => router.push('/incomes')} className="flex flex-col items-center justify-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 hover:border-emerald-500/50 p-3 rounded-xl transition-all group">
+                          <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg group-hover:scale-110 transition-transform">
+                              <TrendingUp size={20} />
+                          </div>
+                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white">Nova Receita</span>
+                      </button>
+
+                      <button onClick={() => router.push('/accounts')} className="flex flex-col items-center justify-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 hover:border-indigo-500/50 p-3 rounded-xl transition-all group">
+                          <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg group-hover:scale-110 transition-transform">
+                              <CreditCard size={20} />
+                          </div>
+                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white">Cartões</span>
+                      </button>
+
+                      <button onClick={() => router.push('/profile')} className="flex flex-col items-center justify-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 hover:border-amber-500/50 p-3 rounded-xl transition-all group">
+                          <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg group-hover:scale-110 transition-transform">
+                              <User size={20} />
+                          </div>
+                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white">Perfil</span>
+                      </button>
+                  </div>
+              </div>
+          </div>
+
+          <div className="mt-1">
+             <InsightBar text={incomeActionsInsight} />
           </div>
 
         </div>
@@ -595,6 +729,24 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               )}
            </div>
         </div>
+      </div>
+
+      {/* RODA PÉ */}
+      <div className="mt-8 border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-indigo-500/20 rounded-lg flex items-center justify-center text-indigo-400">
+                  <span className="font-bold text-xs">B</span>
+              </div>
+              <p className="text-xs text-zinc-500">© 2024 Meu Bleu. Financeiro Inteligente.</p>
+          </div>
+
+          <div className="flex items-center gap-6">
+              <button className="text-[10px] text-zinc-600 hover:text-zinc-300 transition-colors">Termos de Uso</button>
+              <button className="text-[10px] text-zinc-600 hover:text-zinc-300 transition-colors">Política de Privacidade</button>
+              <button className="text-[10px] text-zinc-600 hover:text-zinc-300 transition-colors flex items-center gap-1">
+                  Suporte <ArrowUpRight size={10} />
+              </button>
+          </div>
       </div>
       
       <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
