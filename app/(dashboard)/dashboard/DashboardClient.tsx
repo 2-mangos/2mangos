@@ -10,7 +10,7 @@ import {
   AlertTriangle, Lightbulb, Activity, Lock, 
   ArrowLeft, Zap, ChevronRight, ChevronDown, CreditCard,
   CalendarClock, AlertCircle, Target, CheckCircle, ArrowUpRight,
-  User, Settings, HelpCircle 
+  User, Plus 
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../../lib/utils'
 import { useState, useEffect, useMemo, useTransition } from 'react'
@@ -54,10 +54,18 @@ interface DashboardProps {
   selectedYear: number
 }
 
+// --- COMPONENTE INSIGHT BAR PADRONIZADO E COM EFEITO DE LUZ ---
 const InsightBar = ({ text }: { text: string }) => (
-  <div className="flex items-center gap-2 bg-indigo-500/10 p-2.5 rounded-lg border border-indigo-500/20 backdrop-blur-sm animate-in fade-in">
-      <Lightbulb size={14} className="text-indigo-400 shrink-0" />
-      <p className="text-[10px] font-medium text-indigo-100 leading-tight line-clamp-2">{text}</p>
+  <div className="group flex items-center gap-3 bg-indigo-500/10 px-3 py-2.5 rounded-xl border border-indigo-500/20 backdrop-blur-sm animate-in fade-in transition-colors hover:bg-indigo-500/15 cursor-default">
+      <div className="relative shrink-0">
+          <Lightbulb 
+            size={16} 
+            className="text-indigo-400 transition-all duration-500 ease-out group-hover:text-amber-300 group-hover:drop-shadow-[0_0_8px_rgba(252,211,77,0.5)]" 
+          />
+      </div>
+      <p className="text-xs font-medium text-indigo-200 leading-snug line-clamp-2 group-hover:text-indigo-100 transition-colors">
+        {text}
+      </p>
   </div>
 )
 
@@ -78,10 +86,9 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   const maxCcValue = Math.max(...(data.ccCategoryData.map(c => c.value) || [0]), 1)
   const getCcBarColor = (value: number) => {
       const ratio = value / maxCcValue
-      if (ratio > 0.8) return '#a855f7'
-      if (ratio > 0.5) return '#6366f1'
-      if (ratio > 0.2) return '#818cf8'
-      return '#a5b4fc'
+      if (ratio > 0.8) return '#6366f1' // Indigo forte
+      if (ratio > 0.5) return '#818cf8' // Indigo médio
+      return '#a5b4fc' // Indigo claro
   }
 
   const daysUntilDue = useMemo(() => {
@@ -104,10 +111,9 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
       else { dueText = `Em ${daysUntilDue} dias`; dueColorClass = "text-zinc-400"; }
   }
 
-  // CORREÇÃO AQUI: Removido o filtro '!acc.is_credit_card'
   const activeBudgets = useMemo(() => {
     return data.accountsList
-        .filter(acc => acc.monthly_budget && acc.monthly_budget > 0) // <--- Alterado para incluir cartões
+        .filter(acc => acc.monthly_budget && acc.monthly_budget > 0)
         .map(acc => {
             const spend = data.allCategorySpends.find(c => c.name === acc.name)?.value || 0
             const percent = (spend / acc.monthly_budget) * 100
@@ -120,7 +126,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                 percent,
                 isOver,
                 color: acc.color,
-                is_card: acc.is_credit_card // Passando flag para UI se quiser diferenciar
+                is_card: acc.is_credit_card
             }
         })
         .sort((a, b) => b.percent - a.percent) 
@@ -131,7 +137,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     { name: 'Variáveis', value: data.expenseTypeBreakdown.variable },
   ].filter(d => d.value > 0)
 
-  const COLORS_PIE = ['#6366f1', '#10b981']
+  const COLORS_PIE = ['#6366f1', '#f43f5e']
 
   const expensesInsight = useMemo(() => {
     let deficitStreak = 0;
@@ -243,6 +249,12 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   if (data.healthScore >= 80) { scoreTextColor = 'text-indigo-400'; scoreLabel = 'Excelente'; scoreDesc = 'Parabéns! Poupando muito.' }
   else if (data.healthScore >= 50) { scoreTextColor = 'text-yellow-400'; scoreLabel = 'Atenção'; scoreDesc = 'No limite.' }
 
+  // --- Função auxiliar para o getMonochromeColor ---
+  const getMonochromeColor = (index: number) => {
+    const opacities = ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'];
+    return opacities[index % opacities.length];
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
@@ -316,7 +328,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           </div>
 
           <div className="card h-[440px] flex flex-col p-5">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start justify-between mb-4 shrink-0">
                   <div>
                     <h3 className="text-base font-semibold text-white">Perfil de Despesas</h3>
                     <p className="text-xs text-zinc-500">Onde seu dinheiro está indo</p>
@@ -324,12 +336,20 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               </div>
               
               {expenseTypeData.length > 0 ? (
-                  <div className="flex flex-col h-full gap-4">
-                      <div className="h-[140px] w-full relative shrink-0">
+                  <div className="flex flex-1 gap-4 min-h-0 mb-3 items-center">
+                      {/* GRÁFICO (ESQUERDA) - Aumentado para 45% do espaço */}
+                      <div className="w-[45%] h-[160px] relative shrink-0 flex items-center justify-center">
                           <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                   <Pie 
-                                      data={expenseTypeData} cx="50%" cy="50%" innerRadius={45} outerRadius={60} paddingAngle={4} dataKey="value" stroke='none'
+                                      data={expenseTypeData} 
+                                      cx="50%" 
+                                      cy="50%" 
+                                      innerRadius={45} 
+                                      outerRadius={65} 
+                                      paddingAngle={4} 
+                                      dataKey="value" 
+                                      stroke='none'
                                   >
                                       {expenseTypeData.map((entry, index) => (
                                           <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} />
@@ -338,31 +358,39 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                                   <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '12px' }} formatter={(value: number) => [formatCurrency(value)]} />
                               </PieChart>
                           </ResponsiveContainer>
+                          {/* VALOR CENTRAL REDUZIDO E DISCRETO */}
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                              <div className="text-center">
-                                 <span className="text-[9px] text-zinc-500 uppercase block font-bold">Total</span>
-                                 <span className="text-sm font-bold text-white">{formatCurrency(data.currentMonthTotal)}</span>
+                                 <span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Total</span>
+                                 <span className="text-xs font-bold text-zinc-200">{formatCurrency(data.currentMonthTotal)}</span>
                              </div>
                           </div>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                      {/* LISTA (DIREITA) - 55% do espaço */}
+                      <div className="w-[55%] overflow-y-auto custom-scrollbar pr-1 space-y-4 pt-1">
                           {data.expenseTypeBreakdown.fixed > 0 && (
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs pb-1 border-b border-white/5">
-                                    <span className="text-indigo-400 font-bold flex items-center gap-1.5 uppercase tracking-wider"><CalendarClock size={12}/> Fixas ({((data.expenseTypeBreakdown.fixed / data.currentMonthTotal) * 100).toFixed(0)}%)</span>
-                                    <span className="text-zinc-300 font-semibold">{formatCurrency(data.expenseTypeBreakdown.fixed)}</span>
+                                    <span className="text-indigo-400 font-bold flex items-center gap-1.5 uppercase tracking-wider">
+                                       <span className="w-2 h-2 rounded-full bg-indigo-500"></span> Fixas
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500">{((data.expenseTypeBreakdown.fixed / data.currentMonthTotal) * 100).toFixed(0)}%</span>
                                 </div>
-                                <ul className="space-y-1.5">{data.expenseTypeBreakdown.topFixed.map((item, idx) => (<li key={idx} className="flex justify-between items-center text-[11px] group"><span className="text-zinc-400 truncate max-w-[120px] group-hover:text-zinc-200 transition-colors">{item.name}</span><span className="text-zinc-500 group-hover:text-white transition-colors">{formatCurrency(item.value)}</span></li>))}</ul>
+                                <span className="text-zinc-300 font-semibold text-xs block mb-1">{formatCurrency(data.expenseTypeBreakdown.fixed)}</span>
+                                <ul className="space-y-1.5">{data.expenseTypeBreakdown.topFixed.map((item, idx) => (<li key={idx} className="flex justify-between items-center text-[10px] group"><span className="text-zinc-400 truncate max-w-[80px] group-hover:text-zinc-200 transition-colors">{item.name}</span><span className="text-zinc-500 group-hover:text-white transition-colors">{formatCurrency(item.value)}</span></li>))}</ul>
                             </div>
                           )}
                           {data.expenseTypeBreakdown.variable > 0 && (
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs pb-1 border-b border-white/5">
-                                    <span className="text-emerald-400 font-bold flex items-center gap-1.5 uppercase tracking-wider"><Zap size={12}/> Variáveis ({((data.expenseTypeBreakdown.variable / data.currentMonthTotal) * 100).toFixed(0)}%)</span>
-                                    <span className="text-zinc-300 font-semibold">{formatCurrency(data.expenseTypeBreakdown.variable)}</span>
+                                    <span className="text-rose-400 font-bold flex items-center gap-1.5 uppercase tracking-wider">
+                                        <span className="w-2 h-2 rounded-full bg-rose-500"></span> Variáveis
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500">{((data.expenseTypeBreakdown.variable / data.currentMonthTotal) * 100).toFixed(0)}%</span>
                                 </div>
-                                <ul className="space-y-1.5">{data.expenseTypeBreakdown.topVariable.map((item, idx) => (<li key={idx} className="flex justify-between items-center text-[11px] group"><span className="text-zinc-400 truncate max-w-[120px] group-hover:text-zinc-200 transition-colors">{item.name}</span><span className="text-zinc-500 group-hover:text-white transition-colors">{formatCurrency(item.value)}</span></li>))}</ul>
+                                <span className="text-zinc-300 font-semibold text-xs block mb-1">{formatCurrency(data.expenseTypeBreakdown.variable)}</span>
+                                <ul className="space-y-1.5">{data.expenseTypeBreakdown.topVariable.map((item, idx) => (<li key={idx} className="flex justify-between items-center text-[10px] group"><span className="text-zinc-400 truncate max-w-[80px] group-hover:text-zinc-200 transition-colors">{item.name}</span><span className="text-zinc-500 group-hover:text-white transition-colors">{formatCurrency(item.value)}</span></li>))}</ul>
                             </div>
                           )}
                       </div>
@@ -374,7 +402,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                   </div>
               )}
 
-              <div className="mt-auto pt-3">
+              <div className="mt-auto pt-4">
                   <InsightBar text={profileInsight} />
               </div>
           </div>
@@ -383,9 +411,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
              <div className="card p-5 flex flex-col">
                 <div className="flex items-center justify-between mb-4 shrink-0">
                     <div>
-                        <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                           <Target size={16} className="text-indigo-400"/> Metas
-                        </h3>
+                        <h3 className="text-base font-semibold text-white">Metas</h3>
                         <p className="text-xs text-zinc-500">Orçamento por categoria</p>
                     </div>
                 </div>
@@ -475,10 +501,9 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
              </div>
 
           </div>
-
-          <div className="h-10 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-4 flex items-center justify-start gap-2.5">
-            <Lightbulb size={14} className="text-indigo-400 shrink-0" />
-            <p className="text-[11px] font-medium text-indigo-100 truncate">{miniInsight}</p>
+          
+          <div className="mt-1">
+              <InsightBar text={miniInsight} />
           </div>
 
           <div className="card h-[440px] p-5">
@@ -496,7 +521,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" /> 
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#71717a' }} dy={10} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#71717a' }} tickFormatter={(value) => `${value/1000}k`} />
-                        <Tooltip cursor={{ stroke: '#52525b', strokeWidth: 1 }} contentStyle={{ borderRadius: '8px', border: '1px solid #27272a', background: '#18181b', color: '#fff', fontSize: '12px' }} formatter={(value: number) => [formatCurrency(value)]} />
+                        <Tooltip cursor={{ stroke: '#6366F1', strokeWidth: 1 }} contentStyle={{ borderRadius: '8px', border: '1px solid #27272a', background: '#18181b', color: '#fff', fontSize: '12px' }} formatter={(value: number) => [formatCurrency(value)]} />
                         <Legend verticalAlign="bottom" align="center" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }}/>
                         {(chartFilter === 'all' || chartFilter === 'expense') && (<Line type="monotone" dataKey="expense" name="Despesas" stroke={colors.red} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: colors.red }} />)}
                         {(chartFilter === 'all' || chartFilter === 'income') && (<Line type="monotone" dataKey="income" name="Receitas" stroke={colors.green} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: colors.green }} />)}
@@ -509,9 +534,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               <div className="card p-5 h-[300px] flex flex-col">
                   <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                           <ArrowUpRight size={16} className="text-emerald-400"/> Origem das Receitas
-                        </h3>
+                        <h3 className="text-base font-semibold text-white">Origem das Receitas</h3>
                         <p className="text-xs text-zinc-500">Fontes de entrada</p>
                       </div>
                       <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">{formatCurrency(data.totalIncome)}</span>
@@ -542,41 +565,39 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                   )}
               </div>
               
-              <div className="card p-5 h-[300px] flex flex-col justify-between">
-                  <div>
-                      <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                          <Zap size={16} className="text-amber-400"/> Ações Rápidas
-                      </h3>
+              <div className="card p-5 h-[300px] flex flex-col">
+                  <div className="mb-3 shrink-0">
+                      <h3 className="text-base font-semibold text-white">Ações Rápidas</h3>
                       <p className="text-xs text-zinc-500">Atalhos para o dia a dia</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mt-2 h-full">
-                      <button onClick={() => router.push('/expenses')} className="flex flex-col items-center justify-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 hover:border-indigo-500/50 p-3 rounded-xl transition-all group">
-                          <div className="p-2 bg-red-500/10 text-red-400 rounded-lg group-hover:scale-110 transition-transform">
-                              <TrendingDown size={20} />
+                  <div className="flex flex-col gap-2.5 flex-1">
+                      <button onClick={() => router.push('/expenses')} className="group w-full flex items-center gap-3.5 px-4 h-11 rounded-xl border border-white/5 bg-zinc-900/30 hover:bg-zinc-800 hover:border-white/10 transition-all">
+                          <div className="text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                              <TrendingDown size={18} strokeWidth={2}/>
                           </div>
-                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white">Nova Despesa</span>
+                          <span className="text-sm font-medium text-zinc-300 group-hover:text-white">Nova Despesa</span>
                       </button>
 
-                      <button onClick={() => router.push('/incomes')} className="flex flex-col items-center justify-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 hover:border-emerald-500/50 p-3 rounded-xl transition-all group">
-                          <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg group-hover:scale-110 transition-transform">
-                              <TrendingUp size={20} />
+                      <button onClick={() => router.push('/incomes')} className="group w-full flex items-center gap-3.5 px-4 h-11 rounded-xl border border-white/5 bg-zinc-900/30 hover:bg-zinc-800 hover:border-white/10 transition-all">
+                          <div className="text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                              <TrendingUp size={18} strokeWidth={2}/>
                           </div>
-                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white">Nova Receita</span>
+                          <span className="text-sm font-medium text-zinc-300 group-hover:text-white">Nova Receita</span>
                       </button>
 
-                      <button onClick={() => router.push('/accounts')} className="flex flex-col items-center justify-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 hover:border-indigo-500/50 p-3 rounded-xl transition-all group">
-                          <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg group-hover:scale-110 transition-transform">
-                              <CreditCard size={20} />
+                      <button onClick={() => router.push('/accounts')} className="group w-full flex items-center gap-3.5 px-4 h-11 rounded-xl border border-white/5 bg-zinc-900/30 hover:bg-zinc-800 hover:border-white/10 transition-all">
+                          <div className="text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                              <CreditCard size={18} strokeWidth={2}/>
                           </div>
-                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white">Cartões</span>
+                          <span className="text-sm font-medium text-zinc-300 group-hover:text-white">Gerenciar Cartões</span>
                       </button>
 
-                      <button onClick={() => router.push('/profile')} className="flex flex-col items-center justify-center gap-2 bg-zinc-800/50 hover:bg-zinc-800 border border-white/5 hover:border-amber-500/50 p-3 rounded-xl transition-all group">
-                          <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg group-hover:scale-110 transition-transform">
-                              <User size={20} />
+                      <button onClick={() => router.push('/profile')} className="group w-full flex items-center gap-3.5 px-4 h-11 rounded-xl border border-white/5 bg-zinc-900/30 hover:bg-zinc-800 hover:border-white/10 transition-all">
+                          <div className="text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                              <User size={18} strokeWidth={2}/>
                           </div>
-                          <span className="text-xs font-medium text-zinc-300 group-hover:text-white">Perfil</span>
+                          <span className="text-sm font-medium text-zinc-300 group-hover:text-white">Meu Perfil</span>
                       </button>
                   </div>
               </div>
@@ -600,7 +621,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                     <span className="font-medium text-zinc-300 truncate max-w-[150px]" title={cat.name}>{cat.name}</span>
                     <div className="text-right flex items-center gap-2"><span className="font-semibold text-white">{formatCurrency(cat.value)}</span><span className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">{cat.percent.toFixed(0)}%</span></div>
                   </div>
-                  <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${cat.percent}%`, backgroundColor: index === 0 ? '#6366F1' : index === 1 ? '#818CF8' : '#A5B4FC' }} /></div>
+                  <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${cat.percent}%`, backgroundColor: getMonochromeColor(index) }} /></div>
                 </div>))) : ( <div className="flex h-[200px] items-center justify-center text-zinc-600 text-sm">Nenhuma despesa neste período.</div> )}
             </div>
           </div>
