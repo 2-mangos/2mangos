@@ -21,8 +21,13 @@ export interface Account {
   name: string
   color: string
   is_credit_card: boolean
-  credit_limit?: number // <--- CAMPO NOVO (Opcional, pois contas normais não têm limite)
+  credit_limit?: number 
   order_index: number
+  
+  // NOVO CAMPO: Define o comportamento padrão ao selecionar esta conta
+  default_type: 'fixa' | 'variavel'
+  
+  icon?: string // Garanti que o ícone está tipado aqui também
   created_at?: string
 }
 
@@ -33,33 +38,30 @@ export type ExpenseStatus = 'pago' | 'pendente'
 export interface Expense {
   id: string
   user_id: string
-  name: string // Nome da conta/categoria
+  name: string
   value: number
-  date: string // ISO Date string
+  date: string
   type: ExpenseType
   status: ExpenseStatus
   
-  // Específico de Cartão de Crédito
   is_credit_card: boolean
   
-  // Específico de Despesa Fixa/Recorrente
   is_fixed_value?: boolean
   recurrence_months?: number
-  parent_id?: string // Para parcelas ou recorrências geradas
+  parent_id?: string
   
   created_at?: string
 }
 
-// Objeto para criação (sem ID)
 export type CreateExpenseDTO = Omit<Expense, 'id' | 'created_at' | 'user_id'>
 
-// --- TRANSAÇÕES DO CARTÃO (Detalhes da Fatura) ---
+// --- TRANSAÇÕES DO CARTÃO ---
 export interface CardTransaction {
   id: string
-  expense_id: string // ID da "fatura" (Expense) pai
+  expense_id: string
   description: string
   amount: number
-  category: string // Categoria específica do gasto (ex: Alimentação)
+  category: string
   created_at: string
 }
 
@@ -70,5 +72,24 @@ export interface Income {
   description: string
   amount: number
   date: string
+  created_at?: string
+}
+
+// ... imports
+
+export interface Account {
+  id: string
+  user_id: string
+  name: string
+  color: string
+  is_credit_card: boolean
+  credit_limit?: number 
+  order_index: number
+  default_type: 'fixa' | 'variavel'
+  icon?: string 
+  
+  // NOVO CAMPO
+  monthly_budget?: number 
+  
   created_at?: string
 }
