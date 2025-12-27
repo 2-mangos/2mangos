@@ -1,6 +1,5 @@
 // lib/types.ts
 
-// --- USUÁRIO ---
 export interface UserProfile {
   id: string
   email: string
@@ -14,69 +13,6 @@ export interface UserProfile {
   updated_at: string
 }
 
-// --- CONTAS / CATEGORIAS ---
-export interface Account {
-  id: string
-  user_id: string
-  name: string
-  color: string
-  is_credit_card: boolean
-  credit_limit?: number 
-  order_index: number
-  
-  // NOVO CAMPO: Define o comportamento padrão ao selecionar esta conta
-  default_type: 'fixa' | 'variavel'
-  
-  icon?: string // Garanti que o ícone está tipado aqui também
-  created_at?: string
-}
-
-// --- DESPESAS (Lançamentos) ---
-export type ExpenseType = 'fixa' | 'variavel'
-export type ExpenseStatus = 'pago' | 'pendente'
-
-export interface Expense {
-  id: string
-  user_id: string
-  name: string
-  value: number
-  date: string
-  type: ExpenseType
-  status: ExpenseStatus
-  
-  is_credit_card: boolean
-  
-  is_fixed_value?: boolean
-  recurrence_months?: number
-  parent_id?: string
-  
-  created_at?: string
-}
-
-export type CreateExpenseDTO = Omit<Expense, 'id' | 'created_at' | 'user_id'>
-
-// --- TRANSAÇÕES DO CARTÃO ---
-export interface CardTransaction {
-  id: string
-  expense_id: string
-  description: string
-  amount: number
-  category: string
-  created_at: string
-}
-
-// --- RECEITAS ---
-export interface Income {
-  id: string
-  user_id: string
-  description: string
-  amount: number
-  date: string
-  created_at?: string
-}
-
-// ... imports
-
 export interface Account {
   id: string
   user_id: string
@@ -87,9 +23,20 @@ export interface Account {
   order_index: number
   default_type: 'fixa' | 'variavel'
   icon?: string 
-  
-  // NOVO CAMPO
   monthly_budget?: number 
-  
+  closing_day?: number 
+  due_day?: number     
+  created_at?: string
+}
+
+export interface Expense {
+  id: string
+  user_id: string
+  name: string // Nome da conta vinculada
+  value: number
+  date: string
+  type: 'fixa' | 'variavel'
+  status: 'pago' | 'pendente'
+  is_credit_card: boolean
   created_at?: string
 }

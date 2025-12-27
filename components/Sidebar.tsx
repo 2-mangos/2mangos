@@ -7,9 +7,11 @@ import {
   List, 
   Wallet, 
   Tags, 
-  TrendingUp
+  TrendingUp,
+  CreditCard // Adicionado apenas este import
 } from 'lucide-react'
 
+// MANTIDO: export function (Exportação nomeada conforme seu original)
 export function Sidebar() {
   const pathname = usePathname()
   
@@ -27,14 +29,15 @@ export function Sidebar() {
     {
       title: 'MOVIMENTAÇÕES',
       items: [
-        { name: 'Lançamentos', path: '/expenses', icon: List }, // Agora aponta para /expenses
+        { name: 'Lançamentos', path: '/expenses', icon: List },
+        { name: 'Cartões', path: '/cards', icon: CreditCard }, // INSERIDO: Apenas esta linha
         { name: 'Receitas', path: '/incomes', icon: TrendingUp },
       ]
     },
     {
       title: 'ORGANIZAÇÃO',
       items: [
-        { name: 'Categorias', path: '/accounts', icon: Tags } // Aponta para /accounts conforme solicitado
+        { name: 'Categorias', path: '/accounts', icon: Tags }
       ]
     }
   ]

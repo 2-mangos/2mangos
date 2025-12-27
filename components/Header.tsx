@@ -6,7 +6,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-export function Header() {
+export default function Header() {
   const [userName, setUserName] = useState('Usuário')
   const [userInitial, setUserInitial] = useState('U')
   const [userPlan, setUserPlan] = useState('Free')
