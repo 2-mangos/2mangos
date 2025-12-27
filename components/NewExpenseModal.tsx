@@ -2,168 +2,209 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '../lib/supabase'
-import { X } from 'lucide-react'
-import { CreateExpenseDTO, Account, ExpenseType } from '../lib/types'
-import { useToast } from './ToastContext' 
+import { X, Calendar, Tag, Wallet, Check, AlertCircle } from 'lucide-react'
+import { Account } from '../lib/types'
+import { useToast } from './ToastContext'
 
 interface NewExpenseModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (expense: CreateExpenseDTO & { recurrence_months?: number }) => void
+  onSuccess: () => void
 }
 
-export default function NewExpenseModal({ isOpen, onClose, onSave }: NewExpenseModalProps) {
-  const [name, setName] = useState('')
-  const [amount, setAmount] = useState('')
-  const [date, setDate] = useState('')
-  const [type, setType] = useState<ExpenseType>('variavel') 
-  const [recurrence, setRecurrence] = useState('') 
-  const [isFixedValue, setIsFixedValue] = useState(false)
-  const [isCreditCard, setIsCreditCard] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-
-  const [availableAccounts, setAvailableAccounts] = useState<Account[]>([])
-  
-  const { addToast } = useToast() 
+export default function NewExpenseModal({ isOpen, onClose, onSuccess }: NewExpenseModalProps) {
+  const { addToast } = useToast()
   const supabase = createClient()
+  
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [loading, setLoading] = useState(false)
+  const [isCreditCard, setIsCreditCard] = useState(false)
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    value: '',
+    date: new Date().toISOString().split('T')[0],
+    account_id: '',
+    type: 'variavel' as 'fixa' | 'variavel',
+    status: 'pendente' as 'pago' | 'pendente'
+  })
 
   useEffect(() => {
     if (isOpen) {
       fetchAccounts()
-      // Resetar form ao abrir
-      setDate(new Date().toISOString().split('T')[0])
     }
   }, [isOpen])
 
   async function fetchAccounts() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('accounts').select('*').eq('user_id', user.id).order('name')
-    setAvailableAccounts((data as Account[]) || [])
+    const { data } = await supabase.from('accounts').select('*').order('name')
+    if (data) setAccounts(data)
   }
 
-  // --- MUDANÇA AUTOMÁTICA ---
-  function handleAccountChange(accountName: string) {
-    setName(accountName)
-    const account = availableAccounts.find(a => a.name === accountName)
-    
-    if (account) {
-      // 1. Define se é cartão
-      setIsCreditCard(account.is_credit_card)
-      
-      // 2. Define o tipo automaticamente (Se a conta tiver um padrão definido)
-      if (account.default_type) {
-         setType(account.default_type)
+  // Função para calcular a data de vencimento automática
+  const calculateDueDate = (dueDay: number) => {
+    const now = new Date()
+    let year = now.getFullYear()
+    let month = now.getMonth()
+
+    // Se o dia atual já passou do dia de vencimento, assume o mês seguinte
+    if (now.getDate() > dueDay) {
+      month++
+      if (month > 11) {
+        month = 0
+        year++
       }
     }
+
+    // Cria a data com o dia de vencimento configurado
+    const dueDate = new Date(year, month, dueDay)
+    return dueDate.toISOString().split('T')[0]
+  }
+
+  const handleAccountChange = (accountId: string) => {
+    const selectedAcc = accounts.find(a => a.id === accountId)
+    const isCard = selectedAcc?.is_credit_card || false
+    
+    setIsCreditCard(isCard)
+
+    if (isCard && selectedAcc?.due_day) {
+      const autoDate = calculateDueDate(selectedAcc.due_day)
+      setFormData({ 
+        ...formData, 
+        account_id: accountId, 
+        date: autoDate,
+        type: 'variavel' // Cartão é sempre variável por padrão
+      })
+    } else {
+      setFormData({ ...formData, account_id: accountId })
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const selectedAcc = accounts.find(a => a.id === formData.account_id)
+
+    const { error } = await supabase.from('expenses').insert({
+      user_id: user.id,
+      name: formData.name,
+      value: parseFloat(formData.value),
+      date: formData.date,
+      type: formData.type,
+      status: formData.status,
+      is_credit_card: isCreditCard,
+      // Se quiser guardar a referência da conta na despesa (opcional dependendo da sua DB)
+      // account_name: selectedAcc?.name 
+    })
+
+    if (error) {
+      addToast('Erro ao salvar lançamento', 'error')
+    } else {
+      addToast('Lançamento realizado!', 'success')
+      onSuccess()
+      onClose()
+      setFormData({
+        name: '',
+        value: '',
+        date: new Date().toISOString().split('T')[0],
+        account_id: '',
+        type: 'variavel',
+        status: 'pendente'
+      })
+      setIsCreditCard(false)
+    }
+    setLoading(false)
   }
 
   if (!isOpen) return null
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    
-    if (!name) {
-      addToast("Por favor, selecione uma conta ou categoria.", "error")
-      return
-    }
-
-    setIsLoading(true)
-    
-    try {
-      const newExpense: CreateExpenseDTO & { recurrence_months?: number } = {
-        name,
-        value: parseFloat(amount.replace(',', '.')),
-        date,
-        type, 
-        status: 'pendente',
-        is_credit_card: isCreditCard,
-        ...(type === 'fixa' && {
-          recurrence_months: recurrence ? parseInt(recurrence) : undefined,
-          is_fixed_value: isFixedValue
-        })
-      }
-
-      await onSave(newExpense)
-      
-      // Resetar Form
-      setName('')
-      setAmount('')
-      setRecurrence('')
-      setIsFixedValue(false)
-      setIsCreditCard(false)
-      onClose()
-
-    } catch (error) {
-      console.error(error)
-      addToast("Ocorreu um problema ao tentar salvar.", "error")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md bg-zinc-900 rounded-2xl shadow-2xl p-6 border border-white/10 animate-in fade-in zoom-in-95">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="w-full max-w-md bg-zinc-900 rounded-3xl border border-white/10 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="flex justify-between items-center p-6 border-b border-white/5">
           <h2 className="text-xl font-bold text-white">Novo Lançamento</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors"><X size={24}/></button>
+          <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white rounded-full transition-colors">
+            <X size={20} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          
-          <div className="flex rounded-lg bg-zinc-950 p-1 border border-white/5">
-            <button type="button" onClick={() => setType('variavel')} className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-all ${type === 'variavel' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>Variável</button>
-            <button type="button" onClick={() => setType('fixa')} className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-all ${type === 'fixa' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>Fixa</button>
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Nome e Valor */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Descrição</label>
+              <input 
+                required
+                type="text"
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                placeholder="Ex: Aluguel, Supermercado..."
+                className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Valor (R$)</label>
+              <input 
+                required
+                type="number"
+                step="0.01"
+                value={formData.value}
+                onChange={e => setFormData({...formData, value: e.target.value})}
+                placeholder="0,00"
+                className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-1 focus:ring-indigo-500 outline-none font-bold"
+              />
+            </div>
           </div>
 
+          {/* Seleção de Conta */}
           <div>
-            <label className="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Conta / Descrição</label>
-            <select
+            <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Conta / Categoria</label>
+            <select 
               required
-              value={name}
-              onChange={(e) => handleAccountChange(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+              value={formData.account_id}
+              onChange={e => handleAccountChange(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-1 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
             >
               <option value="">Selecione uma conta...</option>
-              {availableAccounts.map(acc => (
-                <option key={acc.id} value={acc.name}>
-                  {acc.name}
-                </option>
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.name} {acc.is_credit_card ? '(Cartão)' : ''}</option>
               ))}
             </select>
-            {availableAccounts.length === 0 && (
-                <p className="text-xs text-rose-400 mt-2">Nenhuma conta cadastrada. Vá em "Minhas Despesas".</p>
-            )}
           </div>
 
+          {/* Data de Vencimento (Bloqueada se for cartão) */}
           <div>
-            <label className="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">Valor (R$)</label>
-            <input required type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold placeholder:font-normal placeholder:text-zinc-600" placeholder="0.00"/>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">{type === 'fixa' ? 'Vencimento (1ª Parcela)' : 'Vencimento'}</label>
-            <input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm"/>
-          </div>
-
-          {type === 'fixa' && (
-            <div className="rounded-xl bg-blue-500/10 p-4 space-y-3 border border-blue-500/20 animate-in fade-in slide-in-from-top-2">
-              <div>
-                <label className="block text-xs font-bold text-blue-300 mb-1.5 uppercase">Repetir (Meses)</label>
-                <input required type="number" min="2" max="60" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className="w-full rounded-lg border border-blue-500/30 bg-black/20 p-2 text-sm text-white focus:ring-1 focus:ring-blue-400 outline-none" placeholder="Ex: 12"/>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="fixedValue" checked={isFixedValue} onChange={(e) => setIsFixedValue(e.target.checked)} className="h-4 w-4 rounded border-blue-500/50 bg-black/20 text-blue-500 focus:ring-blue-500"/>
-                <label htmlFor="fixedValue" className="text-sm text-blue-200 cursor-pointer select-none">Valor é fixo?</label>
-              </div>
+            <label className="text-xs font-bold text-zinc-500 uppercase ml-1 flex justify-between">
+              Data de Vencimento
+              {isCreditCard && (
+                <span className="text-[10px] text-indigo-400 flex items-center gap-1 normal-case">
+                  <AlertCircle size={10}/> Automático via Cartão
+                </span>
+              )}
+            </label>
+            <div className="relative">
+              <input 
+                type="date"
+                value={formData.date}
+                onChange={e => setFormData({...formData, date: e.target.value})}
+                disabled={isCreditCard}
+                className={`w-full rounded-xl border border-white/10 bg-zinc-950 p-3 text-white focus:ring-1 focus:ring-indigo-500 outline-none ${isCreditCard ? 'opacity-50 cursor-not-allowed border-indigo-500/30 text-indigo-200' : ''}`}
+              />
+              <Calendar size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
             </div>
-          )}
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-3 border border-white/10 text-zinc-300 rounded-xl hover:bg-white/5 font-medium transition-colors text-sm">Cancelar</button>
-            <button type="submit" disabled={isLoading} className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95 text-sm disabled:opacity-50">{isLoading ? 'Salvando...' : 'Salvar'}</button>
           </div>
+
+          {/* Botão Salvar */}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-500 transition-all active:scale-95 shadow-lg shadow-indigo-900/20 disabled:opacity-50 mt-2"
+          >
+            {loading ? 'Salvando...' : 'Confirmar Lançamento'}
+          </button>
         </form>
       </div>
     </div>

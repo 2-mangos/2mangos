@@ -125,26 +125,21 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                            {account.default_type === 'fixa' ? 'Fixa' : 'Variável'}
                         </span>
 
-                        {/* --- CORREÇÃO E ATUALIZAÇÃO DOS BADGES --- */}
-                        
-                        {/* 1. Badge de Cartão */}
                         {account.is_credit_card && (
                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
                                  <CreditCard size={10}/> Cartão
                              </span>
                         )}
 
-                        {/* 2. Badge de Limite (só se tiver valor > 0) */}
                         {account.is_credit_card && (account.credit_limit || 0) > 0 && (
                              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
-                                 Lim: <span className="text-zinc-300">{formatCurrency(account.credit_limit)}</span>
+                                 Lim: <span className="text-zinc-300">{formatCurrency(account.credit_limit || 0)}</span>
                              </span>
                         )}
 
-                        {/* 3. Badge de Meta (só se tiver valor > 0). O uso de (val || 0) > 0 previne exibir '0' */}
                         {(account.monthly_budget || 0) > 0 && (
                             <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-white/5">
-                                Meta: <span className="text-zinc-300">{formatCurrency(account.monthly_budget)}</span>
+                                Meta: <span className="text-zinc-300">{formatCurrency(account.monthly_budget || 0)}</span>
                             </span>
                         )}
                     </div>
@@ -199,7 +194,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
       credit_limit: '',
       monthly_budget: '', 
       icon: 'wallet',
-      default_type: 'variavel' as 'fixa' | 'variavel'
+      default_type: 'variavel' as 'fixa' | 'variavel',
+      closing_day: '',
+      due_day: ''
   })
   
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -241,7 +238,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         credit_limit: acc.credit_limit,
         monthly_budget: acc.monthly_budget, 
         icon: acc.icon,
-        default_type: acc.default_type
+        default_type: acc.default_type,
+        closing_day: acc.closing_day,
+        due_day: acc.due_day
     }))
     await supabase.from('accounts').upsert(updates) 
     router.refresh()
@@ -256,7 +255,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         credit_limit: '', 
         monthly_budget: '', 
         icon: 'wallet', 
-        default_type: 'variavel' 
+        default_type: 'variavel',
+        closing_day: '',
+        due_day: ''
       })
       setIsModalOpen(true) 
   }
@@ -270,7 +271,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
           credit_limit: account.credit_limit ? account.credit_limit.toString() : '',
           monthly_budget: account.monthly_budget ? account.monthly_budget.toString() : '',
           icon: account.icon || 'wallet',
-          default_type: account.default_type || 'variavel'
+          default_type: (account.default_type as 'fixa' | 'variavel') || 'variavel',
+          closing_day: account.closing_day ? account.closing_day.toString() : '',
+          due_day: account.due_day ? account.due_day.toString() : ''
       })
       setOpenMenuId(null)
       setIsModalOpen(true) 
@@ -283,6 +286,8 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
 
     const limitValue = formData.is_credit_card && formData.credit_limit ? parseFloat(formData.credit_limit) : 0
     const budgetValue = formData.monthly_budget ? parseFloat(formData.monthly_budget) : 0
+    const closingDayValue = formData.is_credit_card && formData.closing_day ? parseInt(formData.closing_day) : null
+    const dueDayValue = formData.is_credit_card && formData.due_day ? parseInt(formData.due_day) : null
 
     const payload = {
         name: formData.name,
@@ -291,7 +296,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         credit_limit: limitValue,
         monthly_budget: budgetValue,
         icon: formData.icon,
-        default_type: formData.default_type
+        default_type: formData.default_type,
+        closing_day: closingDayValue,
+        due_day: dueDayValue
     }
 
     let error = null
@@ -461,7 +468,6 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                 </div>
               </div>
               
-              {/* --- ALTERAÇÃO NO FORMULÁRIO: Meta de Gastos SEMPRE disponível --- */}
               <div className="space-y-1.5">
                 <div className="animate-in fade-in slide-in-from-top-2">
                       <label className="text-[10px] font-bold text-zinc-400 uppercase mb-1.5 ml-1 flex items-center gap-1.5">
@@ -588,22 +594,53 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                   </div>
 
                   {formData.is_credit_card && (
-                      <div className="mt-4 pt-4 border-t border-purple-500/10 animate-in fade-in slide-in-from-top-2">
-                           <label className="text-[10px] font-bold text-purple-300 uppercase mb-1.5 ml-1 flex items-center gap-1.5">
-                              <Wallet size={10}/> Limite do Cartão (R$)
-                           </label>
-                           <div className="relative">
-                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-300 font-bold text-sm">R$</span>
-                               <input 
-                                    type="number" 
-                                    step="0.01"
-                                    value={formData.credit_limit} 
-                                    onChange={(e) => setFormData({...formData, credit_limit: e.target.value})} 
-                                    onClick={(e) => e.stopPropagation()}
-                                    placeholder="0,00" 
-                                    className="w-full rounded-lg border border-purple-500/30 bg-black/40 py-2.5 pl-9 pr-3 text-white focus:ring-1 focus:ring-purple-500 outline-none text-sm placeholder:text-zinc-600 font-bold"
-                               />
+                      <div className="mt-4 pt-4 border-t border-purple-500/10 animate-in fade-in slide-in-from-top-2 space-y-4" onClick={(e) => e.stopPropagation()}>
+                           <div>
+                               <label className="text-[10px] font-bold text-purple-300 uppercase mb-1.5 ml-1 flex items-center gap-1.5">
+                                  <Wallet size={10}/> Limite do Cartão (R$)
+                               </label>
+                               <div className="relative">
+                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-300 font-bold text-sm">R$</span>
+                                   <input 
+                                        type="number" 
+                                        step="0.01"
+                                        value={formData.credit_limit} 
+                                        onChange={(e) => setFormData({...formData, credit_limit: e.target.value})} 
+                                        placeholder="0,00" 
+                                        className="w-full rounded-lg border border-purple-500/30 bg-black/40 py-2.5 pl-9 pr-3 text-white focus:ring-1 focus:ring-purple-500 outline-none text-sm placeholder:text-zinc-600 font-bold"
+                                   />
+                               </div>
                            </div>
+
+                           <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[10px] font-bold text-purple-300 uppercase mb-1.5 ml-1 flex items-center gap-1.5">
+                                  <CalendarClock size={10}/> Dia Fechamento
+                                </label>
+                                <input 
+                                  type="number" 
+                                  min="1" max="31"
+                                  value={formData.closing_day} 
+                                  onChange={(e) => setFormData({...formData, closing_day: e.target.value})}
+                                  className="w-full rounded-lg border border-purple-500/30 bg-black/40 py-2.5 px-3 text-white focus:ring-1 focus:ring-purple-500 outline-none text-sm font-bold"
+                                  placeholder="Ex: 5"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-purple-300 uppercase mb-1.5 ml-1 flex items-center gap-1.5">
+                                  <CalendarClock size={10}/> Dia Vencimento
+                                </label>
+                                <input 
+                                  type="number" 
+                                  min="1" max="31"
+                                  value={formData.due_day} 
+                                  onChange={(e) => setFormData({...formData, due_day: e.target.value})}
+                                  className="w-full rounded-lg border border-purple-500/30 bg-black/40 py-2.5 px-3 text-white focus:ring-1 focus:ring-purple-500 outline-none text-sm font-bold"
+                                  placeholder="Ex: 12"
+                                />
+                              </div>
+                           </div>
+
                            <p className="text-[10px] text-purple-300/60 mt-2 flex items-center gap-1">
                              <Check size={10} /> Categoria definida automaticamente como <strong>Variável</strong>.
                            </p>
