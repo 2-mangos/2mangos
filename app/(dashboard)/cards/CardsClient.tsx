@@ -1,18 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { Account, Expense } from '@/lib/types'
+import { useState, useMemo } from 'react'
+import { Account } from '@/lib/types'
 import { 
-  ReceiptText, 
+  TrendingUp, 
+  CreditCard as CardIcon, 
+  Lock, 
+  Zap, 
+  AlertTriangle, 
   Calendar, 
-  Info,
-  CreditCard as CardIcon,
-  X,
-  Lock
+  ArrowUpRight,
+  Calculator,
+  PieChart as PieChartIcon
 } from 'lucide-react'
-import { getCardInvoiceData } from '@/app/actions/cards'
-import { useToast } from '@/components/ToastContext'
 import UpgradeModal from '@/components/UpgradeModal'
+import { 
+  XAxis, Tooltip, ResponsiveContainer, AreaChart, Area,
+  PieChart, Pie, Cell 
+} from 'recharts'
 
 interface CardsClientProps {
   initialAccounts: Account[]
@@ -20,123 +25,212 @@ interface CardsClientProps {
 }
 
 export default function CardsClient({ initialAccounts, userPlan }: CardsClientProps) {
-  const { addToast } = useToast()
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
-  const [selectedInvoice, setSelectedInvoice] = useState<{name: string, items: Expense[], period: string} | null>(null)
-  const [isSearching, setIsSearching] = useState<string | null>(null)
-
-  // Normalização rigorosa: apenas bloqueia se o plano for 'free'
-  // Se for 'premium' ou qualquer outra coisa, o bloqueio não aparece
+  const [selectedCardId, setSelectedCardId] = useState(initialAccounts[0]?.id || null)
+  
   const isFree = userPlan?.toLowerCase() === 'free'
 
-  const handleViewInvoice = async (card: Account) => {
-    if (isFree) {
-      setIsUpgradeModalOpen(true)
-      return
-    }
+  const selectedCard = useMemo(() => 
+    initialAccounts.find(acc => acc.id === selectedCardId), 
+  [selectedCardId, initialAccounts])
 
-    const closingDay = (card as any).closing_day
-    if (!closingDay) {
-      addToast('Configure o dia de fechamento na tela de Categorias.', 'error')
-      return
-    }
+  // Mock de dados para o Cockpit
+  const totalFaturaAtual = 2850.40
+  const limiteTotal = selectedCard?.credit_limit || 0
+  const percentualUso = ((totalFaturaAtual / (limiteTotal || 1)) * 100).toFixed(1)
 
-    setIsSearching(card.id)
-    try {
-      const data = await getCardInvoiceData(card.name, Number(closingDay))
-      setSelectedInvoice({
-        name: card.name,
-        items: data.items,
-        period: data.period
-      })
-    } catch (err) {
-      addToast('Erro ao carregar itens.', 'error')
-    } finally {
-      setIsSearching(null)
-    }
-  }
+  const evolutionData = [
+    { dia: '01', valor: 400 },
+    { dia: '10', valor: 1200 },
+    { dia: '20', valor: 1800 },
+    { dia: '30', valor: totalFaturaAtual },
+  ]
+
+  const categoryData = [
+    { name: 'Alimentação', value: 1200, color: '#6366f1' },
+    { name: 'Transporte', value: 450, color: '#818cf8' },
+    { name: 'Lazer', value: 800, color: '#4f46e5' },
+    { name: 'Outros', value: 400, color: '#312e81' },
+  ]
 
   return (
-    <div className="relative min-h-[400px]">
-      {/* O Grid só fica desfocado se isFree for verdadeiro */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-all duration-500 ${isFree ? 'blur-[4px] pointer-events-none opacity-40 select-none' : ''}`}>
-        {initialAccounts.map((card) => (
-          <div key={card.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 relative min-h-[200px] flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${card.color}20`, color: card.color }}>
-                  <CardIcon className="w-5 h-5" />
-                </div>
-                <span className="font-semibold text-zinc-100">{card.name}</span>
-              </div>
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* 1. CABEÇALHO ÚNICO PADRONIZADO */}
+      <div className="flex flex-col gap-4">
+        
+        {/* 2. SELETOR DE CARTÕES (ABAIXO DO SUBTÍTULO) */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {initialAccounts.map((card) => (
+            <button
+              key={card.id}
+              onClick={() => setSelectedCardId(card.id)}
+              className={`px-4 py-2 rounded-xl font-semibold text-xs transition-all border whitespace-nowrap ${
+                selectedCardId === card.id 
+                  ? 'bg-zinc-100 text-zinc-950 border-zinc-100 shadow-lg' 
+                  : 'bg-zinc-900/50 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+              }`}
+            >
+              {card.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-end">
+      {/* 3. CONTEÚDO DO COCKPIT */}
+      <div className={`relative transition-all duration-500 ${isFree ? 'blur-md pointer-events-none opacity-40 select-none' : ''}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          
+          {/* COLUNA ESQUERDA (60%) */}
+          <div className="lg:col-span-3 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-6 rounded-3xl bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-sm">
+                <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">Fatura Atual</p>
+                <p className="text-2xl font-bold text-zinc-100 italic">R$ {totalFaturaAtual.toLocaleString('pt-BR')}</p>
+              </div>
+              <div className="p-6 rounded-3xl bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-sm">
+                <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">Uso do Limite</p>
+                <p className={`text-2xl font-bold italic ${Number(percentualUso) > 80 ? 'text-red-400' : 'text-indigo-400'}`}>
+                  {percentualUso}%
+                </p>
+              </div>
+              <div className="p-6 rounded-3xl bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-sm">
+                <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">Projeção</p>
+                <p className="text-2xl font-bold text-zinc-500 italic">R$ 3.120,00</p>
+              </div>
+            </div>
+
+            {/* DESIGN DO CARTÃO */}
+            <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-black border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden shadow-2xl">
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-16">
                   <div>
-                    <p className="text-zinc-500 text-xs">Melhor dia de compra</p>
-                    <p className="text-blue-400 font-bold">Dia {(card as any).closing_day || '--'}</p>
+                    <h2 className="text-3xl font-bold text-zinc-100 tracking-tighter uppercase leading-none">{selectedCard?.name}</h2>
+                    <p className="text-zinc-600 font-mono mt-2 italic text-xs uppercase tracking-widest opacity-60">Premium Access</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-zinc-500 text-xs">Limite</p>
-                    <p className="text-zinc-200 font-medium text-sm">R$ {card.credit_limit?.toLocaleString('pt-BR') || '0,00'}</p>
+                  <div className="p-4 rounded-2xl bg-zinc-100/5 border border-zinc-100/10" style={{ color: selectedCard?.color }}>
+                    <CardIcon size={32} />
                   </div>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10 text-xs">
+                  <div className="space-y-1">
+                    <p className="text-zinc-500 uppercase font-bold tracking-tighter">Limite Total</p>
+                    <p className="text-base font-bold text-zinc-100 italic">R$ {limiteTotal.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-zinc-500 uppercase font-bold tracking-tighter">Disponível</p>
+                    <p className="text-base font-bold text-emerald-400 italic">R$ {(limiteTotal - totalFaturaAtual).toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-zinc-500 uppercase font-bold tracking-tighter">Melhor Dia</p>
+                    <p className="text-base font-bold text-blue-400 italic">Dia {selectedCard?.closing_day}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-zinc-500 uppercase font-bold tracking-tighter">Vencimento</p>
+                    <p className="text-base font-bold text-zinc-100 italic">Dia {selectedCard?.due_day}</p>
+                  </div>
+                </div>
+
+                <div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/30">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-1000 ${Number(percentualUso) > 80 ? 'bg-red-500' : 'bg-indigo-500'}`}
+                    style={{ width: `${percentualUso}%` }}
+                  />
                 </div>
               </div>
             </div>
 
-            <button 
-              onClick={() => handleViewInvoice(card)}
-              disabled={isSearching === card.id}
-              className="w-full mt-6 flex items-center justify-center gap-2 text-sm py-2.5 rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 hover:bg-zinc-700 transition-all"
-            >
-              Ver Itens da Fatura
-              <ReceiptText className="w-4 h-4" />
-            </button>
+            {/* INSIGHTS */}
+            <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-[2rem] p-8">
+              <h4 className="text-indigo-400 font-bold text-[10px] uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
+                <Zap size={14} fill="currentColor" /> Bleu IA Insights
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center shrink-0 text-indigo-400">
+                    <Calendar size={18} />
+                  </div>
+                  <p className="text-sm text-zinc-400 leading-relaxed">
+                    Melhor dia para compra: <span className="text-zinc-100 font-semibold">{selectedCard?.closing_day}</span>. Ganhe fôlego financeiro.
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-2xl bg-red-500/10 flex items-center justify-center shrink-0 text-red-400">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <p className="text-sm text-zinc-400 leading-relaxed">
+                    Uso de limite em <span className="text-red-400 font-bold">{percentualUso}%</span>. Cuidado com gastos variáveis.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-        ))}
+
+          {/* COLUNA DIREITA (40%) */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-zinc-900/40 border border-zinc-800/50 p-6 rounded-[2rem] h-[300px] backdrop-blur-sm">
+              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <TrendingUp size={14} className="text-indigo-400" /> Evolução Mensal
+              </h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={evolutionData}>
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="valor" stroke="#6366f1" strokeWidth={2} fill="url(#colorValue)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="bg-zinc-900/40 border border-zinc-800/50 p-6 rounded-[2rem] h-[300px] backdrop-blur-sm">
+              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <PieChartIcon size={14} className="text-indigo-400" /> Categorias
+              </h4>
+              <div className="flex h-[200px] items-center">
+                <div className="w-1/2 space-y-2">
+                  {categoryData.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-[10px] text-zinc-500 font-bold truncate">{item.name}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="w-1/2 h-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={categoryData} innerRadius={50} outerRadius={65} paddingAngle={4} dataKey="value">
+                        {categoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="none" />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-[2rem] p-8">
+              <h4 className="text-zinc-100 font-bold text-sm mb-6 uppercase tracking-widest text-center">Operações</h4>
+              <div className="space-y-3">
+                <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-zinc-950/50 border border-zinc-800 hover:border-zinc-700 transition-all text-zinc-400 hover:text-zinc-100 group">
+                  <div className="flex items-center gap-3">
+                    <Calculator size={18} />
+                    <span className="text-sm font-medium">Simular Compra</span>
+                  </div>
+                  <ArrowUpRight size={16} className="opacity-30 group-hover:opacity-100 transition-opacity" />
+                </button>
+                <button className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl bg-zinc-100 text-zinc-950 font-bold text-sm hover:bg-white transition-all shadow-lg shadow-white/5">
+                  Explorar Fatura
+                  <TrendingUp size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* O Overlay só aparece se isFree for verdadeiro */}
-      {isFree && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center p-6 bg-black/10 rounded-3xl">
-          <div className="bg-indigo-600/20 p-5 rounded-full mb-4 ring-1 ring-indigo-500/30">
-            <Lock className="w-10 h-10 text-indigo-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-3">Funcionalidade Premium</h2>
-          <p className="text-zinc-400 text-sm max-w-sm mb-8">
-            A gestão detalhada de faturas é exclusiva para membros <span className="text-indigo-400 font-bold">Premium</span>.
-          </p>
-          <button 
-            onClick={() => setIsUpgradeModalOpen(true)}
-            className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-500 shadow-xl active:scale-95 transition-all"
-          >
-            Fazer Upgrade Agora
-          </button>
-        </div>
-      )}
-
       <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} />
-
-      {/* MODAL DE FATURA (Mantido) */}
-      {selectedInvoice && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-           {/* ... conteúdo do modal já existente ... */}
-           <div className="bg-zinc-900 border border-zinc-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
-              <div className="p-6 border-b border-zinc-800 flex justify-between items-start">
-                <h3 className="font-bold text-xl text-white">Fatura: {selectedInvoice.name}</h3>
-                <button onClick={() => setSelectedInvoice(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="p-4 max-h-[50vh] overflow-y-auto">
-                {selectedInvoice.items.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center p-4 mb-2 rounded-2xl bg-zinc-950 border border-zinc-800">
-                    <span className="text-white font-bold text-sm">{item.name}</span>
-                    <span className="text-white font-mono">R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                ))}
-              </div>
-           </div>
-        </div>
-      )}
     </div>
   )
 }
