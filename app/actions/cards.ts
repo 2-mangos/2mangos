@@ -12,65 +12,79 @@ export async function updateCardSettings(accountId: string, data: {
   due_day?: number
 }) {
   const supabase = await createClient()
-  
-  const { error } = await supabase
-    .from('accounts')
-    .update(data)
-    .eq('id', accountId)
-
-  if (error) {
-    console.error("Erro ao atualizar conta:", error.message)
-    throw new Error(error.message)
-  }
-  
+  const { error } = await supabase.from('accounts').update(data).eq('id', accountId)
+  if (error) throw new Error(error.message)
   revalidatePath('/cards')
 }
 
 /**
- * Busca todas as despesas vinculadas a um cartão dentro do ciclo da fatura atual.
- * Retorna os itens e a string do período formatada.
+ * Busca estatísticas consolidadas para os gráficos: Fatura, Categorias e Evolução.
  */
-export async function getCardInvoiceData(accountName: string, closingDay: number) {
+export async function getCardStats(accountName: string, month: number, year: number) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) return { items: [], period: "" }
+  if (!user) return null
 
-  const now = new Date()
-  let startMonth = now.getMonth()
-  let startYear = now.getFullYear()
+  const startDate = new Date(year, month, 1).toISOString()
+  const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString()
 
-  // Lógica de ciclo de fatura:
-  // Se hoje já passou do dia de fechamento, a fatura aberta é a que vence no próximo mês.
-  if (now.getDate() > closingDay) {
-    startMonth = now.getMonth()
-  } else {
-    startMonth = now.getMonth() - 1
-  }
-
-  // Define as datas de início (dia após o fechamento) e fim (dia do fechamento seguinte)
-  const startDate = new Date(startYear, startMonth, closingDay + 1, 0, 0, 0)
-  const endDate = new Date(startYear, startMonth + 1, closingDay, 23, 59, 59)
-
-  const { data: expenses, error } = await supabase
+  // 1. Busca a despesa principal do cartão
+  const { data: expenses } = await supabase
     .from('expenses')
-    .select('*')
+    .select('id, value')
     .eq('user_id', user.id)
     .eq('name', accountName)
-    .eq('is_credit_card', true)
-    .gte('date', startDate.toISOString())
-    .lte('date', endDate.toISOString())
-    .order('date', { ascending: false })
+    .gte('date', startDate)
+    .lte('date', endDate)
 
-  if (error) {
-    console.error("Erro ao buscar fatura:", error.message)
-    return { items: [], period: "" }
+  const expenseIds = expenses?.map(e => e.id) || []
+  const totalFatura = expenses?.reduce((acc, exp) => acc + exp.value, 0) || 0
+
+  // 2. Busca as transações detalhadas para as Categorias
+  let categoryData: any[] = []
+  if (expenseIds.length > 0) {
+    const { data: transactions } = await supabase
+      .from('card_transactions')
+      .select('amount, category')
+      .in('expense_id', expenseIds)
+
+    const categoriesMap = transactions?.reduce((acc: any, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount
+      return acc
+    }, {}) || {}
+
+    const colors = ['#6366f1', '#818cf8', '#a5b4fc', '#312e81', '#4f46e5', '#818cf8']
+    categoryData = Object.entries(categoriesMap).map(([name, value], index) => ({
+      name: name.toUpperCase(),
+      value,
+      color: colors[index % colors.length]
+    }))
   }
 
-  const periodStr = `${startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} a ${endDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
+  // 3. Evolução dos últimos 6 meses
+  const evolutionData = []
+  const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+  
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(year, month - i, 1)
+    const m = d.getMonth()
+    const y = d.getFullYear()
+    const start = new Date(y, m, 1).toISOString()
+    const end = new Date(y, m + 1, 0).toISOString()
 
-  return {
-    items: expenses || [],
-    period: periodStr
+    const { data: mExp } = await supabase
+      .from('expenses')
+      .select('value')
+      .eq('user_id', user.id)
+      .eq('name', accountName)
+      .gte('date', start)
+      .lte('date', end)
+
+    evolutionData.push({
+      name: monthLabels[m],
+      valor: mExp?.reduce((acc, curr) => acc + curr.value, 0) || 0
+    })
   }
+
+  return { totalFatura, categoryData, evolutionData }
 }

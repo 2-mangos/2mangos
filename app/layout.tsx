@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google"; 
-import "./globals.css";
-import { ToastProvider } from "../components/ToastContext";
+import "./globals.css"; // Caminho correto, pois estão na mesma pasta
+import { ToastProvider } from "@/components/ToastContext"; 
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -20,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
-      <body className={`${inter.className} antialiased bg-[#09090b] text-zinc-100`}>
+    <html lang="pt-BR" className="dark">
+      <body className={`${inter.variable} font-sans antialiased bg-background text-foreground`}>
         <ToastProvider>
            {children}
         </ToastProvider>
