@@ -54,7 +54,6 @@ interface DashboardProps {
   selectedYear: number
 }
 
-// --- COMPONENTE INSIGHT BAR PADRONIZADO E COM EFEITO DE LUZ ---
 const InsightBar = ({ text }: { text: string }) => (
   <div className="group flex items-center gap-3 bg-indigo-500/10 px-3 py-2.5 rounded-xl border border-indigo-500/20 backdrop-blur-sm animate-in fade-in transition-colors hover:bg-indigo-500/15 cursor-default">
       <div className="relative shrink-0">
@@ -86,9 +85,9 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   const maxCcValue = Math.max(...(data.ccCategoryData.map(c => c.value) || [0]), 1)
   const getCcBarColor = (value: number) => {
       const ratio = value / maxCcValue
-      if (ratio > 0.8) return '#6366f1' // Indigo forte
-      if (ratio > 0.5) return '#818cf8' // Indigo médio
-      return '#a5b4fc' // Indigo claro
+      if (ratio > 0.8) return '#6366f1'
+      if (ratio > 0.5) return '#818cf8'
+      return '#a5b4fc'
   }
 
   const daysUntilDue = useMemo(() => {
@@ -133,7 +132,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   }, [data.accountsList, data.allCategorySpends])
 
   const expenseTypeData = [
-    { name: 'Fixas', value: data.expenseTypeBreakdown.fixed },
+    { name: 'Recorrentes', value: data.expenseTypeBreakdown.fixed },
     { name: 'Variáveis', value: data.expenseTypeBreakdown.variable },
   ].filter(d => d.value > 0)
 
@@ -168,9 +167,9 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
     if (total === 0) return "Sem dados suficientes.";
     const fixedPercent = (fixed / total) * 100;
     const variablePercent = (variable / total) * 100;
-    if (fixedPercent > 70) return `Alerta: ${fixedPercent.toFixed(0)}% das despesas são fixas. Rigidez orçamentária.`;
+    if (fixedPercent > 70) return `Alerta: ${fixedPercent.toFixed(0)}% das despesas são recorrentes. Rigidez orçamentária.`;
     if (variablePercent > 60) return `Atenção: Variáveis são ${variablePercent.toFixed(0)}%. Tente cortar supérfluos.`;
-    return `Equilíbrio: ${fixedPercent.toFixed(0)}% Fixas vs ${variablePercent.toFixed(0)}% Variáveis.`;
+    return `Equilíbrio: ${fixedPercent.toFixed(0)}% Recorrentes vs ${variablePercent.toFixed(0)}% Variáveis.`;
   }, [data.expenseTypeBreakdown]);
 
   const incomeActionsInsight = useMemo(() => {
@@ -192,11 +191,12 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   useEffect(() => {
     if (selectedAccount) {
       startTransition(async () => {
-        const chartData = await getAccountYearlyData(selectedYear, selectedAccount)
+        // CORREÇÃO: Passando o mês selecionado para a busca de 12 meses
+        const chartData = await getAccountYearlyData(selectedYear, selectedMonth, selectedAccount)
         setSpecificChartData(chartData)
       })
     }
-  }, [selectedAccount, selectedYear])
+  }, [selectedAccount, selectedYear, selectedMonth])
 
   function handleFilterChange(month: number, year: number) {
     router.push(`/dashboard?month=${month}&year=${year}`)
@@ -249,7 +249,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   if (data.healthScore >= 80) { scoreTextColor = 'text-indigo-400'; scoreLabel = 'Excelente'; scoreDesc = 'Parabéns! Poupando muito.' }
   else if (data.healthScore >= 50) { scoreTextColor = 'text-yellow-400'; scoreLabel = 'Atenção'; scoreDesc = 'No limite.' }
 
-  // --- Função auxiliar para o getMonochromeColor ---
   const getMonochromeColor = (index: number) => {
     const opacities = ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'];
     return opacities[index % opacities.length];
@@ -307,7 +306,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         
-        {/* --- COLUNA ESQUERDA (33%) --- */}
+        {/* COLUNA ESQUERDA */}
         <div className="flex flex-col gap-4">
           
           <div className={`${cardClassBase} h-52 p-5`}>
@@ -331,34 +330,27 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               <div className="flex items-start justify-between mb-4 shrink-0">
                   <div>
                     <h3 className="text-base font-semibold text-white">Perfil de Despesas</h3>
-                    <p className="text-xs text-zinc-500">Onde seu dinheiro está indo</p>
+                    {/* Rótulo corrigido para Últimos 12 meses */}
+                    <p className="text-xs text-zinc-500">Últimos 12 meses</p>
                   </div>
               </div>
               
               {expenseTypeData.length > 0 ? (
                   <div className="flex flex-1 gap-4 min-h-0 mb-3 items-center">
-                      {/* GRÁFICO (ESQUERDA) - Aumentado para 45% do espaço */}
                       <div className="w-[45%] h-[160px] relative shrink-0 flex items-center justify-center">
                           <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                   <Pie 
                                       data={expenseTypeData} 
-                                      cx="50%" 
-                                      cy="50%" 
-                                      innerRadius={45} 
-                                      outerRadius={65} 
-                                      paddingAngle={4} 
-                                      dataKey="value" 
-                                      stroke='none'
+                                      cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="value" stroke='none'
                                   >
                                       {expenseTypeData.map((entry, index) => (
                                           <Cell key={`cell-${index}`} fill={COLORS_PIE[index % COLORS_PIE.length]} />
                                       ))}
                                   </Pie>
-                                  <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '12px' }} formatter={(value: number) => [formatCurrency(value)]} />
+                                  <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', color: '#fff', fontSize: '12px' }} formatter={(value: number, name: string) => [formatCurrency(value), name] as [string, string]} />
                               </PieChart>
                           </ResponsiveContainer>
-                          {/* VALOR CENTRAL REDUZIDO E DISCRETO */}
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                              <div className="text-center">
                                  <span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Total</span>
@@ -367,13 +359,13 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                           </div>
                       </div>
 
-                      {/* LISTA (DIREITA) - 55% do espaço */}
                       <div className="w-[55%] overflow-y-auto custom-scrollbar pr-1 space-y-4 pt-1">
                           {data.expenseTypeBreakdown.fixed > 0 && (
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs pb-1 border-b border-white/5">
+                                    {/* Nomenclatura corrigida para Recorrentes */}
                                     <span className="text-indigo-400 font-bold flex items-center gap-1.5 uppercase tracking-wider">
-                                       <span className="w-2 h-2 rounded-full bg-indigo-500"></span> Fixas
+                                       <span className="w-2 h-2 rounded-full bg-indigo-500"></span> Recorrentes
                                     </span>
                                     <span className="text-[10px] text-zinc-500">{((data.expenseTypeBreakdown.fixed / data.currentMonthTotal) * 100).toFixed(0)}%</span>
                                 </div>
@@ -398,7 +390,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               ) : (
                   <div className="h-full flex flex-col items-center justify-center text-zinc-600 gap-3">
                       <AlertCircle size={32} className="opacity-50"/>
-                      <p className="text-xs text-center max-w-[180px]">Classifique suas contas como Fixas ou Variáveis para ver a análise aqui.</p>
+                      <p className="text-xs text-center max-w-[180px]">Classifique suas contas como Recorrentes ou Variáveis para ver a análise aqui.</p>
                   </div>
               )}
 
@@ -453,7 +445,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
         </div>
 
-        {/* --- COLUNA DIREITA (66%) --- */}
+        {/* COLUNA DIREITA */}
         <div className="lg:col-span-2 flex flex-col gap-4">
 
           <div className="grid grid-cols-3 gap-3">
@@ -508,7 +500,8 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
           <div className="card h-[440px] p-5">
             <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div><h3 className="text-base font-semibold text-white">Fluxo Financeiro</h3><p className="text-xs text-zinc-500">Anual ({selectedYear})</p></div>
+                {/* Rótulo corrigido para Últimos 12 meses */}
+                <div><h3 className="text-base font-semibold text-white">Fluxo Financeiro</h3><p className="text-xs text-zinc-500">Últimos 12 meses</p></div>
                 <div className="bg-zinc-900 border border-white/5 p-0.5 rounded-lg flex">
                     {[{ key: 'all', label: 'Tudo' }, { key: 'income', label: 'Receitas' }, { key: 'expense', label: 'Despesas' }].map((filter) => (
                         <button key={filter.key} onClick={() => setChartFilter(filter.key)} className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all duration-200 ${chartFilter === filter.key ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}>{filter.label}</button>
@@ -521,7 +514,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" /> 
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#71717a' }} dy={10} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#71717a' }} tickFormatter={(value) => `${value/1000}k`} />
-                        <Tooltip cursor={{ stroke: '#6366F1', strokeWidth: 1 }} contentStyle={{ borderRadius: '8px', border: '1px solid #27272a', background: '#18181b', color: '#fff', fontSize: '12px' }} formatter={(value: number) => [formatCurrency(value)]} />
+                        <Tooltip cursor={{ stroke: '#6366F1', strokeWidth: 1 }} contentStyle={{ borderRadius: '8px', border: '1px solid #27272a', background: '#18181b', color: '#fff', fontSize: '12px' }} formatter={(value: number) => [formatCurrency(value), 'Valor'] as [string, string]} />
                         <Legend verticalAlign="bottom" align="center" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }}/>
                         {(chartFilter === 'all' || chartFilter === 'expense') && (<Line type="monotone" dataKey="expense" name="Despesas" stroke={colors.red} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: colors.red }} />)}
                         {(chartFilter === 'all' || chartFilter === 'income') && (<Line type="monotone" dataKey="income" name="Receitas" stroke={colors.green} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: colors.green }} />)}
@@ -628,7 +621,8 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           
           <div className="card rounded-2xl p-5">
             <div className="mb-6 flex items-center justify-between">
-              <div><h3 className="text-base font-semibold text-white">Evolução por Categoria</h3><p className="text-xs text-zinc-500">Histórico anual</p></div>
+              {/* Rótulo corrigido para Últimos 12 meses */}
+              <div><h3 className="text-base font-semibold text-white">Evolução por Categoria</h3><p className="text-xs text-zinc-500">Últimos 12 meses</p></div>
               <select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} className="text-xs border-white/10 rounded-lg py-1.5 px-3 bg-zinc-800 text-zinc-300 focus:ring-indigo-500 cursor-pointer hover:bg-zinc-700 outline-none">
                 {data.accountNames.map(name => (<option key={name} value={name}>{name}</option>))}
               </select>

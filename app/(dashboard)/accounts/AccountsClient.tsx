@@ -122,7 +122,8 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                             : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
                         }`}>
                            {account.default_type === 'fixa' ? <CalendarClock size={10}/> : <Zap size={10}/>}
-                           {account.default_type === 'fixa' ? 'Fixa' : 'Variável'}
+                           {/* ALTERADO: Fixa -> Recorrente */}
+                           {account.default_type === 'fixa' ? 'Recorrente' : 'Variável'}
                         </span>
 
                         {account.is_credit_card && (
@@ -463,7 +464,8 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                            }
                         `}
                     >
-                        <CalendarClock size={14} /> Fixa (Recorrente)
+                        {/* ALTERADO: Fixa -> Recorrente */}
+                        <CalendarClock size={14} /> Recorrente
                     </button>
                 </div>
               </div>
@@ -648,7 +650,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                   )}
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-2 shrink-0">
                   <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 border border-white/10 text-zinc-400 hover:text-white rounded-xl hover:bg-white/5 font-medium transition-colors text-sm">
                     Cancelar
                   </button>

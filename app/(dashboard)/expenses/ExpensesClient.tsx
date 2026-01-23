@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { 
   MoreVertical, Edit2, Trash2, Save, X, Search, CreditCard, 
   Plus, Calendar, DollarSign, TrendingDown, Wallet, ListFilter, 
-  SquareCheck, Square, Repeat, AlertCircle, ArrowRight
+  SquareCheck, Square, Repeat, ArrowRight
 } from 'lucide-react'
 import NewExpenseModal from '../../../components/NewExpenseModal'
 import CreditCardModal from '../../../components/CreditCardModal'
@@ -45,23 +45,19 @@ export default function ExpensesClient({
   const router = useRouter()
   const supabase = createClient()
 
-  // Estados Locais
   const [searchTerm, setSearchTerm] = useState('')      
   const [filterStatus, setFilterStatus] = useState('todos') 
   const [filterType, setFilterType] = useState('todos')     
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
-  // Estados de Modais
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [selectedCardName, setSelectedCardName] = useState('')
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   
-  // --- NOVO: ESTADO PARA O MODAL DE RECORRÊNCIA ---
   const [recurrenceModalOpen, setRecurrenceModalOpen] = useState(false)
   const [pendingSaveId, setPendingSaveId] = useState<string | null>(null)
 
-  // Estados de Edição/Menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState({ date: '', value: '' })
@@ -143,7 +139,7 @@ export default function ExpensesClient({
           futureExpenses.push({ 
             user_id: user.id, 
             name: data.name, 
-            value: data.is_fixed_value ? data.value : 0, 
+            value: 0, 
             date: d.toISOString(), 
             type: 'fixa', 
             status: 'pendente', 
@@ -204,16 +200,12 @@ export default function ExpensesClient({
     setOpenMenuId(null) 
   }
 
-  // --- NOVA LÓGICA DE SALVAR ---
   async function handleRequestSave(id: string) {
       const expense = initialExpenses.find(e => e.id === id)
-      
-      // Se for fixa, pergunta como salvar
       if (expense && expense.type === 'fixa') {
           setPendingSaveId(id)
           setRecurrenceModalOpen(true)
       } else {
-          // Se for variável, salva direto
           await executeSave(id, 'single')
       }
   }
@@ -221,25 +213,18 @@ export default function ExpensesClient({
   async function executeSave(id: string, mode: 'single' | 'future') {
     const newValue = parseFloat(editValues.value)
     const newDate = editValues.date
-
     let error = null
 
     if (mode === 'single') {
-        // Atualiza apenas este registro (Data e Valor)
         const { error: err } = await supabase
             .from('expenses')
             .update({ date: newDate, value: newValue })
             .eq('id', id)
         error = err
     } else {
-        // MODO "THIS AND FUTURE"
-        // 1. Identificar o grupo (Parent ID ou o próprio ID se for o pai)
         const expense = initialExpenses.find(e => e.id === id)
         if (!expense) return
-
         const groupId = expense.parent_id || expense.id
-        
-        // 2. Atualiza o registro ATUAL (Data e Valor)
         const { error: err1 } = await supabase
             .from('expenses')
             .update({ date: newDate, value: newValue })
@@ -248,17 +233,13 @@ export default function ExpensesClient({
         if (err1) {
             error = err1
         } else {
-            // 3. Atualiza os FUTUROS (Apenas o VALOR, para não bagunçar as datas dos outros meses)
-            // Busca todos que pertencem ao grupo e têm data maior que a data original do registro editado
             const originalDate = expense.date
-            
             const { error: err2 } = await supabase
                 .from('expenses')
-                .update({ value: newValue }) // Propaga apenas o valor novo
-                .or(`id.eq.${groupId},parent_id.eq.${groupId}`) // Pertence ao grupo
-                .gt('date', originalDate) // É futuro em relação ao editado
-                .neq('id', id) // Não é o que já editamos
-
+                .update({ value: newValue }) 
+                .or(`id.eq.${groupId},parent_id.eq.${groupId}`) 
+                .gt('date', originalDate) 
+                .neq('id', id)
             error = err2
         }
     }
@@ -266,8 +247,7 @@ export default function ExpensesClient({
     if (error) {
       addToast("Erro ao atualizar: " + error.message, 'error')
     } else { 
-      const msg = mode === 'future' ? "Recorrência atualizada com sucesso!" : "Lançamento atualizado!"
-      addToast(msg, 'success')
+      addToast("Atualizado com sucesso!", 'success')
       setEditingId(null)
       setRecurrenceModalOpen(false)
       setPendingSaveId(null)
@@ -289,9 +269,7 @@ export default function ExpensesClient({
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-        
-        {/* HEADER */}
+    <div className="space-y-8 pb-16 animate-in fade-in duration-500">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Lançamentos</h1>
@@ -319,38 +297,27 @@ export default function ExpensesClient({
           </div>
         </div>
 
-        {/* CARDS DE RESUMO (KPIs) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={cardClass}>
                 <div>
-                    <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
-                        {searchTerm ? 'Busca' : 'Despesas'}
-                    </p>
+                    <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">{searchTerm ? 'Busca' : 'Despesas'}</p>
                     <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(currentTableTotal)}</h3>
                 </div>
                 <div className={iconBadgeClass}><DollarSign size={18} /></div>
                 <div className="mt-auto">
-                    <span className="text-[10px] text-rose-400 font-medium bg-rose-500/10 px-2 py-1 rounded">
-                        Total do Período
-                    </span>
+                    <span className="text-[10px] text-rose-400 font-medium bg-rose-500/10 px-2 py-1 rounded">Total do Período</span>
                 </div>
             </div>
-
             <div className={cardClass}>
                 <div>
-                    <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
-                        Fluxo Financeiro
-                    </p>
+                    <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">Fluxo Financeiro</p>
                     <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(kpiData.totalYear)}</h3>
                 </div>
                 <div className={iconBadgeClass}><TrendingDown size={18} /></div>
                 <div className="mt-auto">
-                    <span className="text-[10px] text-zinc-500">
-                        Acumulado ({selectedYear === -1 ? new Date().getFullYear() : selectedYear})
-                    </span>
+                    <span className="text-[10px] text-zinc-500">Acumulado ({selectedYear === -1 ? new Date().getFullYear() : selectedYear})</span>
                 </div>
             </div>
-
             <div className={cardClass}>
                 <div>
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">Média Mensal</p>
@@ -362,41 +329,31 @@ export default function ExpensesClient({
             </div>
         </div>
 
-        {/* TABELA E FILTROS */}
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     <h3 className="text-base font-bold text-white">Movimentações</h3>
                     {selectedIds.length > 0 && (
-                        <button 
-                            onClick={handleDeleteSelected}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-xs font-bold transition-all"
-                        >
+                        <button onClick={handleDeleteSelected} className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg text-xs font-bold transition-all">
                             <Trash2 size={14} /> Excluir {selectedIds.length}
                         </button>
                     )}
                 </div>
                 
                 <div className="flex gap-2 w-full sm:w-auto">
-                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-lg border border-white/5 bg-zinc-900 py-1.5 px-3 text-xs text-zinc-300 focus:ring-1 focus:ring-rose-500 outline-none">
+                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-lg border border-white/5 bg-zinc-900 py-1.5 px-3 text-xs text-zinc-300 outline-none">
                         <option value="todos">Status: Todos</option>
                         <option value="pago">Pagos</option>
                         <option value="pendente">Pendentes</option>
                     </select>
-                    <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rounded-lg border border-white/5 bg-zinc-900 py-1.5 px-3 text-xs text-zinc-300 focus:ring-1 focus:ring-rose-500 outline-none">
+                    <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rounded-lg border border-white/5 bg-zinc-900 py-1.5 px-3 text-xs text-zinc-300 outline-none">
                         <option value="todos">Tipo: Todos</option>
                         <option value="variavel">Variável</option>
-                        <option value="fixa">Fixa</option>
+                        <option value="fixa">Recorrente</option>
                     </select>
                     <div className="relative flex-1 sm:w-48">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
-                        <input 
-                            type="text" 
-                            value={searchTerm} 
-                            onChange={(e) => setSearchTerm(e.target.value)} 
-                            placeholder="Filtrar Lançamentos..." 
-                            className="w-full rounded-lg border border-white/5 bg-zinc-900 py-1.5 pl-9 pr-3 text-xs text-white focus:ring-1 focus:ring-rose-500 outline-none"
-                        />
+                        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Filtrar..." className="w-full rounded-lg border border-white/5 bg-zinc-900 py-1.5 pl-9 pr-3 text-xs text-white outline-none"/>
                     </div>
                 </div>
             </div>
@@ -407,19 +364,15 @@ export default function ExpensesClient({
                         <thead className="bg-zinc-900/50 sticky top-0 z-10 backdrop-blur-md">
                             <tr>
                                 <th className="px-6 py-3 w-10">
-                                    <button onClick={handleSelectAll} className="text-zinc-500 hover:text-white transition-colors">
-                                        {filteredExpenses.length > 0 && selectedIds.length === filteredExpenses.length ? (
-                                            <SquareCheck size={16} className="text-indigo-500" />
-                                        ) : (
-                                            <Square size={16} />
-                                        )}
+                                    <button onClick={handleSelectAll} className="text-zinc-500 hover:text-white">
+                                        {filteredExpenses.length > 0 && selectedIds.length === filteredExpenses.length ? <SquareCheck size={16} className="text-indigo-500" /> : <Square size={16} />}
                                     </button>
                                 </th>
-                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Data</th>
-                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Categoria</th>
-                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Valor</th>
-                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-right text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ações</th>
+                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase">Data</th>
+                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase">Categoria</th>
+                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase">Valor</th>
+                                <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase">Status</th>
+                                <th className="px-6 py-3 text-right text-[10px] font-bold text-zinc-500 uppercase">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
@@ -429,62 +382,38 @@ export default function ExpensesClient({
                                 filteredExpenses.map((expense) => {
                                     const badgeColor = accountsMap[expense.name] || '#71717a'
                                     const isSelected = selectedIds.includes(expense.id)
-                                    
                                     return (
-                                    <tr key={expense.id} className={`transition-colors group ${isSelected ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : 'hover:bg-white/5'}`}>
+                                    <tr key={expense.id} className={`transition-colors group ${isSelected ? 'bg-indigo-500/5' : 'hover:bg-white/5'}`}>
                                         <td className="px-6 py-3">
                                             <button onClick={() => handleSelectOne(expense.id)} className="text-zinc-500 hover:text-white">
                                                 {isSelected ? <SquareCheck size={16} className="text-indigo-500" /> : <Square size={16} />}
                                             </button>
                                         </td>
-
-                                        <td className="px-6 py-3 whitespace-nowrap text-xs text-zinc-300 font-medium">
-                                            {editingId === expense.id ? (
-                                                <input type="date" value={editValues.date} onChange={(e) => setEditValues({...editValues, date: e.target.value})} className="bg-zinc-800 text-white border border-white/10 p-1 rounded w-full"/>
-                                            ) : (
-                                                formatDate(expense.date)
-                                            )}
+                                        <td className="px-6 py-3 text-xs text-zinc-300">
+                                            {editingId === expense.id ? <input type="date" value={editValues.date} onChange={(e) => setEditValues({...editValues, date: e.target.value})} className="bg-zinc-800 text-white p-1 rounded w-full"/> : formatDate(expense.date)}
                                         </td>
-                                        
                                         <td className="px-6 py-3 text-xs text-white">
                                             <div className="flex items-center gap-2">
-                                                <span 
-                                                    onClick={() => handleCardClick(expense)}
-                                                    className={`${pillBaseClass} ${expense.is_credit_card ? 'cursor-pointer hover:border-white/20' : 'border-transparent'}`}
-                                                    style={{ 
-                                                        backgroundColor: hexToRgba(badgeColor, 0.1), 
-                                                        color: badgeColor 
-                                                    }}
-                                                >
-                                                    {expense.is_credit_card && <CreditCard size={10} className="mr-1.5 opacity-80"/>}
+                                                <span onClick={() => handleCardClick(expense)} className={`${pillBaseClass} ${expense.is_credit_card ? 'cursor-pointer' : 'border-transparent'}`} style={{ backgroundColor: hexToRgba(badgeColor, 0.1), color: badgeColor }}>
+                                                    {expense.is_credit_card && <CreditCard size={10} className="mr-1.5"/>}
                                                     {expense.name}
                                                 </span>
-                                                {expense.type === 'fixa' 
-                                                    ? <span className={`${pillBaseClass} bg-blue-500/10 text-blue-400 border-blue-500/20`}>Fixa</span>
-                                                    : <span className={`${pillBaseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>Variável</span>
-                                                }
+                                                {expense.type === 'fixa' ? <span className={`${pillBaseClass} bg-blue-500/10 text-blue-400 border-blue-500/20`}>Recorrente</span> : <span className={`${pillBaseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>Variável</span>}
                                             </div>
                                         </td>
-
-                                        <td className={`px-6 py-3 whitespace-nowrap text-xs font-bold ${expense.status === 'pago' ? 'text-zinc-400 decoration-zinc-600 line-through' : 'text-zinc-200'}`}>
-                                            {editingId === expense.id ? (
-                                                <input type="number" step="0.01" value={editValues.value} onChange={(e) => setEditValues({...editValues, value: e.target.value})} className="w-20 bg-zinc-800 border border-white/10 p-1 rounded font-bold"/>
-                                            ) : (
-                                                formatCurrency(expense.value)
-                                            )}
+                                        <td className={`px-6 py-3 text-xs font-bold ${expense.status === 'pago' ? 'text-zinc-400 line-through' : 'text-zinc-200'}`}>
+                                            {editingId === expense.id ? <input type="number" step="0.01" value={editValues.value} onChange={(e) => setEditValues({...editValues, value: e.target.value})} className="w-20 bg-zinc-800 p-1 rounded font-bold"/> : formatCurrency(expense.value)}
                                         </td>
-
-                                        <td className="px-6 py-3 whitespace-nowrap">
-                                            <button onClick={()=>handleToggleStatus(expense.id, expense.status)} className={`${pillBaseClass} cursor-pointer hover:opacity-80 border ${expense.status === 'pago' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                                        <td className="px-6 py-3">
+                                            <button onClick={()=>handleToggleStatus(expense.id, expense.status)} className={`${pillBaseClass} ${expense.status === 'pago' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
                                                 {expense.status === 'pago' ? 'Pago' : 'Pendente'}
                                             </button>
                                         </td>
-
-                                        <td className="px-6 py-3 text-right text-xs font-medium relative">
+                                        <td className="px-6 py-3 text-right relative">
                                             {editingId === expense.id ? (
                                                 <div className="flex justify-end gap-1">
-                                                    <button onClick={() => handleRequestSave(expense.id)} className="text-emerald-400 hover:bg-emerald-500/10 p-1 rounded"><Save size={14}/></button>
-                                                    <button onClick={() => setEditingId(null)} className="text-red-400 hover:bg-red-500/10 p-1 rounded"><X size={14}/></button>
+                                                    <button onClick={() => handleRequestSave(expense.id)} className="text-emerald-400 p-1"><Save size={14}/></button>
+                                                    <button onClick={() => setEditingId(null)} className="text-red-400 p-1"><X size={14}/></button>
                                                 </div>
                                             ) : (
                                                 <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -507,7 +436,6 @@ export default function ExpensesClient({
             </div>
         </div>
 
-        {/* FOOTER BAR */}
         <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur border-t border-white/5 p-3 md:pl-64 z-40">
            <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-zinc-500">
               <div className="flex items-center gap-2">
@@ -520,68 +448,32 @@ export default function ExpensesClient({
            </div>
         </div>
 
-        {/* MODAL DE CONFIRMAÇÃO DE RECORRÊNCIA */}
         {recurrenceModalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                 <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 shadow-2xl p-6 space-y-4">
                     <div className="flex items-start gap-4">
-                        <div className="bg-blue-500/10 p-3 rounded-full text-blue-400">
-                            <Repeat size={24} />
-                        </div>
+                        <div className="bg-blue-500/10 p-3 rounded-full text-blue-400"><Repeat size={24} /></div>
                         <div>
                             <h3 className="text-lg font-bold text-white">Editar Recorrência</h3>
-                            <p className="text-sm text-zinc-400 mt-1">
-                                Esta é uma despesa fixa. Como deseja aplicar as alterações?
-                            </p>
+                            <p className="text-sm text-zinc-400 mt-1">Como deseja aplicar as alterações?</p>
                         </div>
                     </div>
-
                     <div className="space-y-2 pt-2">
-                        <button 
-                            onClick={() => pendingSaveId && executeSave(pendingSaveId, 'single')}
-                            className="w-full p-4 rounded-xl bg-zinc-800 border border-white/5 hover:border-indigo-500/50 hover:bg-zinc-800/80 text-left transition-all group"
-                        >
-                            <span className="block text-sm font-bold text-white mb-0.5">Apenas este lançamento</span>
-                            <span className="block text-xs text-zinc-500">Altera somente o mês atual.</span>
+                        <button onClick={() => pendingSaveId && executeSave(pendingSaveId, 'single')} className="w-full p-4 rounded-xl bg-zinc-800 border border-white/5 hover:border-indigo-500/50 text-left transition-all">
+                            <span className="block text-sm font-bold text-white">Apenas este lançamento</span>
                         </button>
-
-                        <button 
-                             onClick={() => pendingSaveId && executeSave(pendingSaveId, 'future')}
-                             className="w-full p-4 rounded-xl bg-indigo-600/10 border border-indigo-500/20 hover:bg-indigo-600/20 text-left transition-all group"
-                        >
-                            <span className="block text-sm font-bold text-indigo-200 mb-0.5 flex items-center gap-2">
-                                Este e os próximos <ArrowRight size={14}/>
-                            </span>
-                            <span className="block text-xs text-indigo-300/70">Atualiza o valor deste e de todos os lançamentos futuros.</span>
+                        <button onClick={() => pendingSaveId && executeSave(pendingSaveId, 'future')} className="w-full p-4 rounded-xl bg-indigo-600/10 border border-indigo-500/20 hover:bg-indigo-600/20 text-left transition-all">
+                            <span className="block text-sm font-bold text-indigo-200">Este e os próximos <ArrowRight size={14} className="inline ml-1"/></span>
                         </button>
                     </div>
-
-                    <button onClick={() => setRecurrenceModalOpen(false)} className="w-full py-3 text-xs font-bold text-zinc-500 hover:text-white transition-colors">
-                        Cancelar
-                    </button>
+                    <button onClick={() => setRecurrenceModalOpen(false)} className="w-full py-3 text-xs font-bold text-zinc-500 hover:text-white transition-colors">Cancelar</button>
                 </div>
             </div>
         )}
 
-        <NewExpenseModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-          onSave={handleSaveExpense}
-        />
-
-        <CreditCardModal 
-          isOpen={!!selectedCardId} 
-          onClose={() => setSelectedCardId(null)}
-          expenseId={selectedCardId || ''}
-          expenseName={selectedCardName}
-          onUpdateTotal={() => router.refresh()} 
-        />
-
-        <UpgradeModal 
-          isOpen={showUpgradeModal} 
-          onClose={() => setShowUpgradeModal(false)}
-        />
-
+        <NewExpenseModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveExpense} />
+        <CreditCardModal isOpen={!!selectedCardId} onClose={() => setSelectedCardId(null)} expenseId={selectedCardId || ''} expenseName={selectedCardName} onUpdateTotal={() => router.refresh()} />
+        <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </div>
   )
 }
