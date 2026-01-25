@@ -24,13 +24,12 @@ export interface Expense {
   type: 'fixa' | 'variavel';
   status: 'pago' | 'pendente';
   is_credit_card: boolean;
-  parent_id?: string; // Adicionado para a lógica de recorrência
-  recurrence_months?: number; // Adicionado
-  is_fixed_value?: boolean; // Adicionado
+  parent_id?: string;
+  recurrence_months?: number;
+  is_fixed_value?: boolean;
   created_at?: string;
 }
 
-// O membro que estava faltando:
 export interface CreateExpenseDTO {
   name: string;
   value: number;
@@ -39,7 +38,20 @@ export interface CreateExpenseDTO {
   status: 'pago' | 'pendente';
   is_credit_card: boolean;
   parent_id?: string;
-  // Adicione estas duas linhas abaixo:
   recurrence_months?: number;
   is_fixed_value?: boolean;
+}
+
+// Interface adicionada para resolver o erro de exportação
+export interface CardTransaction {
+  id: string;
+  expense_id: string;
+  user_id: string;
+  description: string;
+  amount: number;
+  date: string;
+  category: string;
+  installments_total?: number;
+  installment_number?: number;
+  created_at: string;
 }

@@ -79,10 +79,14 @@ export default function NewExpenseModal({ isOpen, onClose, onSave }: NewExpenseM
     try {
       const selectedAcc = accounts.find(a => a.id === formData.account_id)
       
+      // CORREÇÃO DEFINITIVA: Forçamos o horário para o meio do dia (12:00) 
+      // para evitar que o fuso horário recue a data para o dia anterior.
+      const dateWithNoon = `${formData.date}T12:00:00.000Z`
+
       const expenseData: CreateExpenseDTO & { recurrence_months?: number; is_fixed_value?: boolean } = {
         name: selectedAcc?.name || 'Lançamento',
         value: parseFloat(formData.value),
-        date: formData.date,
+        date: dateWithNoon,
         type: formData.type,
         status: formData.status,
         is_credit_card: isCreditCard,

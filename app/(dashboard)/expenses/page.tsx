@@ -10,7 +10,6 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) { redirect('/login') }
 
-  // 1. Definição de Datas (Filtros)
   const today = new Date()
   const selectedMonth = params.month ? parseInt(params.month) : today.getMonth()
   const selectedYear = params.year ? parseInt(params.year) : today.getFullYear()
@@ -22,16 +21,20 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
       startDate = new Date(today.getFullYear() - 10, 0, 1).toISOString()
       endDate = new Date(today.getFullYear() + 10, 11, 31).toISOString()
   } else {
+      const monthStr = String(selectedMonth + 1).padStart(2, '0')
+      const lastDay = new Date(selectedYear, selectedMonth + 1, 0).getDate()
+      
       if (selectedMonth === -1) {
-          startDate = new Date(selectedYear, 0, 1).toISOString()
-          endDate = new Date(selectedYear, 11, 31, 23, 59, 59, 999).toISOString()
+          // Busca o ano inteiro
+          startDate = `${selectedYear}-01-01T00:00:00.000Z`
+          endDate = `${selectedYear}-12-31T23:59:59.999Z`
       } else {
-          startDate = new Date(selectedYear, selectedMonth, 1).toISOString()
-          endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59, 999).toISOString()
+          // Busca o mês selecionado com limites claros
+          startDate = `${selectedYear}-${monthStr}-01T00:00:00.000Z`
+          endDate = `${selectedYear}-${monthStr}-${lastDay}T23:59:59.999Z`
       }
   }
 
-  // 2. Buscas Paralelas (User Plan, Accounts, Expenses List, KPI)
   const [
     userData,
     accountsData,
@@ -41,31 +44,22 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
     supabase.from('users').select('plano').eq('id', user.id).single(),
     supabase.from('accounts').select('name, color').eq('user_id', user.id),
     supabase.from('expenses').select('*').eq('user_id', user.id).gte('date', startDate).lte('date', endDate).order('date', { ascending: true }),
-    // KPI Anual (sempre baseado no ano selecionado)
     supabase.from('expenses').select('value, date').eq('user_id', user.id).gte('date', `${selectedYear === -1 ? today.getFullYear() : selectedYear}-01-01`).lte('date', `${selectedYear === -1 ? today.getFullYear() : selectedYear}-12-31`)
   ])
 
   const expenses = (expensesData.data as Expense[]) || []
   
-  // Mapear Cores das Contas
   const accountsMap: Record<string, string> = {}
   if (accountsData.data) {
     (accountsData.data as Account[]).forEach(acc => { accountsMap[acc.name] = acc.color || '#3b82f6' })
   }
 
-  // Calcular KPI
   let kpiTotalYear = 0
   let kpiMonthlyAverage = 0
 
   if (yearKpiData.data) {
       kpiTotalYear = yearKpiData.data.reduce((acc, curr) => acc + curr.value, 0)
-      
-      let divisor = 1
-      if ((selectedYear === -1 ? today.getFullYear() : selectedYear) === today.getFullYear()) {
-          divisor = today.getMonth() + 1
-      } else {
-          divisor = 12
-      }
+      let divisor = (selectedYear === -1 ? today.getFullYear() : selectedYear) === today.getFullYear() ? today.getMonth() + 1 : 12
       kpiMonthlyAverage = kpiTotalYear / divisor
   }
 

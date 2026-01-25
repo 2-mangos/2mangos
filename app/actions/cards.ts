@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
 
 /**
- * Atualiza as configurações de limite e datas de um cartão específico.
+ * Atualiza configurações do cartão. Essencial para que a função SQL
+ * saiba quando fechar a fatura e quando é o vencimento.
  */
 export async function updateCardSettings(accountId: string, data: {
   credit_limit?: number
@@ -13,34 +14,38 @@ export async function updateCardSettings(accountId: string, data: {
 }) {
   const supabase = await createClient()
   const { error } = await supabase.from('accounts').update(data).eq('id', accountId)
+  
   if (error) throw new Error(error.message)
   revalidatePath('/cards')
 }
 
 /**
- * Busca estatísticas consolidadas para os gráficos: Fatura, Categorias e Evolução.
+ * Busca as estatísticas do cartão para o Dashboard.
+ * Agora focado em buscar o valor real da fatura que aparece em /expenses.
  */
 export async function getCardStats(accountName: string, month: number, year: number) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
+  // Intervalo do mês selecionado
   const startDate = new Date(year, month, 1).toISOString()
   const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString()
 
-  // 1. Busca a despesa principal do cartão
+  // 1. Busca a fatura (registro na tabela expenses)
   const { data: expenses } = await supabase
     .from('expenses')
     .select('id, value')
     .eq('user_id', user.id)
     .eq('name', accountName)
+    .eq('is_credit_card', true)
     .gte('date', startDate)
     .lte('date', endDate)
 
   const expenseIds = expenses?.map(e => e.id) || []
-  const totalFatura = expenses?.reduce((acc, exp) => acc + exp.value, 0) || 0
+  const totalFatura = expenses?.reduce((acc, exp) => acc + (Number(exp.value) || 0), 0) || 0
 
-  // 2. Busca as transações detalhadas para as Categorias
+  // 2. Gráfico de Categorias (Busca nas transações vinculadas a essa fatura)
   let categoryData: any[] = []
   if (expenseIds.length > 0) {
     const { data: transactions } = await supabase
@@ -48,20 +53,19 @@ export async function getCardStats(accountName: string, month: number, year: num
       .select('amount, category')
       .in('expense_id', expenseIds)
 
-    const categoriesMap = transactions?.reduce((acc: any, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount
+    const map = transactions?.reduce((acc: any, t) => {
+      acc[t.category] = (acc[t.category] || 0) + Number(t.amount)
       return acc
     }, {}) || {}
 
-    const colors = ['#6366f1', '#818cf8', '#a5b4fc', '#312e81', '#4f46e5', '#818cf8']
-    categoryData = Object.entries(categoriesMap).map(([name, value], index) => ({
+    categoryData = Object.entries(map).map(([name, value]) => ({
       name: name.toUpperCase(),
       value,
-      color: colors[index % colors.length]
+      color: '#6366f1'
     }))
   }
 
-  // 3. Evolução dos últimos 6 meses
+  // 3. Evolução dos últimos 6 meses (Para o gráfico de área)
   const evolutionData = []
   const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
   
@@ -82,9 +86,18 @@ export async function getCardStats(accountName: string, month: number, year: num
 
     evolutionData.push({
       name: monthLabels[m],
-      valor: mExp?.reduce((acc, curr) => acc + curr.value, 0) || 0
+      valor: mExp?.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0) || 0
     })
   }
 
   return { totalFatura, categoryData, evolutionData }
+}
+
+/**
+ * Função de limpeza de cache manual. 
+ * Garante que a lista de /expenses seja atualizada após o modal fechar.
+ */
+export async function refreshFinanceData() {
+  revalidatePath('/expenses')
+  revalidatePath('/cards')
 }

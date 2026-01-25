@@ -1,22 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '../lib/supabase'
-import { X, Plus, Trash2, MoreVertical, Edit2, Save, Layers, FileUp, History, Check } from 'lucide-react'
-import { CardTransaction } from '../lib/types'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { 
+  X, Trash2, Check, CreditCard, Tag, Calendar, 
+  LayoutGrid, ArrowRight, History, DollarSign
+} from 'lucide-react'
+import { formatCurrency } from '../lib/utils'
 import { useToast } from './ToastContext'
-
-const CATEGORIES = [
-  { name: 'Alimentação', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
-  { name: 'Transporte', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-  { name: 'Lazer', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
-  { name: 'Mercado', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-  { name: 'Serviços', color: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
-  { name: 'Compras', color: 'bg-pink-500/10 text-pink-400 border-pink-500/20' },
-  { name: 'Saúde', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
-  { name: 'Outros', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
-]
+import { useRouter } from 'next/navigation'
 
 interface CreditCardModalProps {
   isOpen: boolean
@@ -28,211 +20,244 @@ interface CreditCardModalProps {
 
 export default function CreditCardModal({ isOpen, onClose, expenseId, expenseName, onUpdateTotal }: CreditCardModalProps) {
   const { addToast } = useToast()
+  const router = useRouter()
   const supabase = createClient()
   
-  const [items, setItems] = useState<CardTransaction[]>([])
+  const [items, setItems] = useState<any[]>([])
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [category, setCategory] = useState(CATEGORIES[0].name)
+  const [category, setCategory] = useState('Outros')
   const [isInstallment, setIsInstallment] = useState(false)
   const [installments, setInstallments] = useState('2')
   const [loading, setLoading] = useState(false)
-  const [total, setTotal] = useState(0)
+  const [totalInvoice, setTotalInvoice] = useState(0)
+  const [activeTab, setActiveTab] = useState<'lancamento' | 'historico'>('lancamento')
 
-  // Sugestões (Histórico)
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const filteredSuggestions = items.filter((v, i, a) => a.findIndex(t => t.description === v.description) === i)
-    .filter(item => item.description.toLowerCase().includes(desc.toLowerCase()) && desc.length > 1)
+  const categories = [
+    "Alimentação", "Lazer", "Mercado", "Transporte", "Saúde", 
+    "Educação", "Serviços", "Compras", "Viagem", "Outros"
+  ]
 
-  useEffect(() => {
-    if (isOpen && expenseId) fetchItems()
-  }, [isOpen, expenseId])
+  const syncAndFetch = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
-  async function fetchItems() {
-    const { data } = await supabase.from('card_transactions').select('*').eq('expense_id', expenseId).order('created_at', { ascending: false })
-    if (data) {
-      setItems(data as CardTransaction[])
-      setTotal(data.reduce((acc, curr) => acc + curr.amount, 0))
+    const { data: transactions, error } = await supabase
+      .from('card_transactions')
+      .select('*')
+      .eq('expense_id', expenseId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      addToast("Erro ao sincronizar dados", "error")
+      return
     }
+
+    const list = transactions || []
+    const newTotal = list.reduce((acc, curr) => acc + Number(curr.amount), 0)
+
+    await supabase.from('expenses').update({ value: newTotal }).eq('id', expenseId)
+
+    setItems(list)
+    setTotalInvoice(newTotal)
+    onUpdateTotal()
+    router.refresh()
   }
 
-  async function handleAddItem(e: React.FormEvent) {
+  useEffect(() => {
+    if (isOpen && expenseId) {
+      syncAndFetch()
+    }
+  }, [isOpen, expenseId])
+
+  const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if(!user) return
 
     try {
-        const inputVal = parseFloat(amount.replace(',', '.'))
-        const numInstallments = isInstallment ? parseInt(installments) : 1
+      const { error } = await supabase.rpc('create_card_transaction_manual', {
+        p_user_id: user?.id,
+        p_card_name: expenseName,
+        p_description: desc,
+        p_amount: parseFloat(amount.replace(',', '.')),
+        p_date: `${date}T12:00:00`,
+        p_category: category,
+        p_installments: isInstallment ? parseInt(installments) : 1
+      })
 
-        const { error } = await supabase.rpc('create_card_transaction_installments', {
-            p_user_id: user.id,
-            p_card_name: expenseName,
-            p_description: desc,
-            p_amount: inputVal,
-            p_date: date,
-            p_category: category,
-            p_installments: numInstallments
-        })
+      if (error) throw error
+      
+      addToast("Lançamento confirmado!", 'success')
+      setDesc(''); setAmount(''); setIsInstallment(false); setInstallments('2')
+      await syncAndFetch()
+      
+    } catch (err: any) {
+      addToast("Falha ao salvar: " + err.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-        if (error) throw error
-        setDesc(''); setAmount(''); setIsInstallment(false)
-        addToast("Gasto adicionado!", 'success')
-        fetchItems()
-        onUpdateTotal()
-    } catch (error: any) {
-        addToast('Erro: ' + error.message, 'error')
-    } finally { setLoading(false) }
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm("Remover este lançamento?")) return
+    try {
+      await supabase.from('card_transactions').delete().eq('id', id)
+      addToast("Lançamento removido!", "success")
+      await syncAndFetch()
+    } catch (err: any) {
+      addToast("Erro ao remover", "error")
+    }
   }
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-5xl bg-zinc-950 rounded-[2.5rem] border border-white/10 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+      <div className="w-full max-w-5xl bg-zinc-950 rounded-[2.5rem] border border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
         
-        <div className="p-8 border-b border-white/5 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-white">{expenseName}</h2>
-            <p className="text-sm text-zinc-500 mt-1">Gestão detalhada e importação de fatura</p>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Total da Fatura</span>
-                <span className="text-2xl font-bold text-white">{formatCurrency(total)}</span>
+        {/* HEADER */}
+        <div className="p-8 border-b border-white/5 bg-zinc-900/20 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-14 h-14 bg-indigo-600/10 rounded-[1.25rem] border border-indigo-500/20 flex items-center justify-center text-indigo-500">
+              <CreditCard size={28} />
             </div>
-            <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white transition-colors bg-white/5 rounded-full">
-              <X size={20} />
+            <div>
+              <h2 className="text-2xl font-bold text-white tracking-tight">{expenseName}</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-[0.2em]">Fatura em Aberto</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-8">
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Total Consolidado</p>
+              <h3 className="text-3xl font-black text-white">{formatCurrency(totalInvoice)}</h3>
+            </div>
+            <button onClick={onClose} className="p-3 hover:bg-white/5 rounded-full text-zinc-500 hover:text-white transition-all border border-transparent hover:border-white/10">
+              <X size={24}/>
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-          
-          <div className="flex-1 p-8 overflow-y-auto custom-scrollbar border-r border-white/5">
-            <form onSubmit={handleAddItem} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-2 block">Descrição</label>
-                  <input 
-                    type="text" value={desc} 
-                    onChange={e => {setDesc(e.target.value); setShowSuggestions(true)}}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                    placeholder="" required
-                  />
-                  {showSuggestions && filteredSuggestions.length > 0 && (
-                    <div className="absolute z-20 w-full mt-2 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-                      {filteredSuggestions.map((s, i) => (
-                        <button key={i} type="button" 
-                          onClick={() => { setDesc(s.description); setCategory(s.category); setShowSuggestions(false) }}
-                          className="w-full flex items-center gap-3 p-4 hover:bg-white/5 text-left border-b border-white/5 last:border-0"
-                        >
-                          <History size={14} className="text-indigo-400" />
-                          <span className="text-sm text-zinc-300">{s.description}</span>
-                          <span className="text-[10px] text-zinc-600 ml-auto uppercase">{s.category}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+        {/* NAVEGAÇÃO */}
+        <div className="flex px-8 border-b border-white/5 bg-zinc-900/10">
+            <button onClick={() => setActiveTab('lancamento')} className={`px-6 py-4 text-xs font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'lancamento' ? 'border-indigo-500 text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
+              Novo Lançamento
+            </button>
+            <button onClick={() => setActiveTab('historico')} className={`px-6 py-4 text-xs font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'historico' ? 'border-indigo-500 text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
+              Itens da Fatura ({items.length})
+            </button>
+        </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-2 block">Valor Total</label>
-                  <input 
-                    type="text" value={amount} onChange={e => setAmount(e.target.value)}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-bold"
-                    placeholder="" required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-2 block">Categoria</label>
-                  <select 
-                    value={category} onChange={e => setCategory(e.target.value)}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white focus:ring-1 focus:ring-indigo-500 outline-none appearance-none cursor-pointer"
-                  >
-                    {CATEGORIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-2 block">Data da Compra</label>
-                  <input 
-                    type="date" value={date} onChange={e => setDate(e.target.value)}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 bg-zinc-900/50 rounded-2xl border border-white/5">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsInstallment(!isInstallment)}>
-                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isInstallment ? 'bg-indigo-600 border-indigo-600' : 'border-zinc-700'}`}>
-                            {isInstallment && <Check size={12} className="text-white" />}
-                        </div>
-                        <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Esta compra é parcelada?</span>
-                    </div>
-                    {isInstallment && (
-                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
-                            <span className="text-xs text-zinc-500 font-bold uppercase">Quantidade:</span>
-                            <input type="number" min="2" max="48" value={installments} onChange={e => setInstallments(e.target.value)} className="w-16 bg-zinc-950 border border-white/10 rounded-lg p-2 text-center text-white" />
-                        </div>
-                    )}
-                </div>
-              </div>
-
-              <button type="submit" disabled={loading} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-500 transition-all active:scale-95 shadow-lg shadow-indigo-600/20">
-                {loading ? 'Processando...' : 'Adicionar à Fatura'}
-              </button>
-            </form>
-
-            <div className="mt-10 space-y-3">
-                <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Lançamentos Recentes</h4>
-                {items.slice(0, 5).map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-4 bg-zinc-900/30 border border-white/5 rounded-2xl group hover:border-white/10 transition-all">
-                        <div className="flex items-center gap-4">
-                            <div className="w-2 h-2 rounded-full" style={{backgroundColor: CATEGORIES.find(c => c.name === item.category)?.color.split(' ')[1] || '#fff'}} />
-                            <div>
-                                <p className="text-sm font-medium text-white">{item.description}</p>
-                                <p className="text-[10px] text-zinc-600 uppercase font-bold">{formatDate(item.created_at)} • {item.category}</p>
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+          {activeTab === 'lancamento' ? (
+            <div className="w-full max-w-3xl mx-auto">
+                <form onSubmit={handleAddItem} className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 tracking-widest">Descrição</label>
+                            <div className="relative">
+                                <Tag className="absolute left-4 top-4 text-zinc-600" size={18} />
+                                <input type="text" placeholder="Ex: Amazon" value={desc} onChange={e => setDesc(e.target.value)} className="w-full bg-zinc-900/50 border border-white/10 p-4 pl-12 rounded-2xl text-white outline-none focus:ring-2 focus:ring-indigo-500/50" required />
                             </div>
                         </div>
-                        <span className="text-sm font-bold text-white">{formatCurrency(item.amount)}</span>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 tracking-widest">Valor</label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-4 top-4 text-zinc-600" size={18} />
+                                <input type="text" placeholder="0,00" value={amount} onChange={e => setAmount(e.target.value)} className="w-full bg-zinc-900/50 border border-white/10 p-4 pl-12 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-500/50" required />
+                            </div>
+                        </div>
                     </div>
-                ))}
-            </div>
-          </div>
 
-          <div className="w-full md:w-80 bg-zinc-900/20 p-8 flex flex-col justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <FileUp size={16} /> Importar Arquivo
-              </h3>
-              <div className="border-2 border-dashed border-white/5 rounded-[2rem] p-8 flex flex-col items-center text-center group hover:border-indigo-500/30 transition-all cursor-pointer bg-zinc-900/50">
-                <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center mb-4 text-indigo-400">
-                    <FileUp size={24} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 tracking-widest">Categoria</label>
+                            <div className="relative">
+                                <LayoutGrid className="absolute left-4 top-4 text-zinc-600" size={18} />
+                                <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-zinc-900/50 border border-white/10 p-4 pl-12 rounded-2xl text-white outline-none appearance-none">
+                                    {categories.map(cat => <option key={cat} value={cat} className="bg-zinc-950">{cat}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 tracking-widest">Data</label>
+                            <div className="relative">
+                                <Calendar className="absolute left-4 top-4 text-zinc-600" size={18} />
+                                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-zinc-900/50 border border-white/10 p-4 pl-12 rounded-2xl text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-6 bg-zinc-900/30 rounded-3xl border border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div onClick={() => setIsInstallment(!isInstallment)} className={`w-6 h-6 rounded-lg border flex items-center justify-center cursor-pointer transition-all ${isInstallment ? 'bg-indigo-600 border-indigo-600' : 'border-zinc-700 bg-zinc-950'}`}>
+                                {isInstallment && <Check size={14} className="text-white" />}
+                            </div>
+                            <span className="text-xs font-bold text-zinc-300 uppercase tracking-widest">Compra Parcelada?</span>
+                        </div>
+                        {isInstallment && (
+                            <div className="flex items-center gap-3 bg-zinc-950 p-2 px-4 rounded-xl border border-white/5">
+                                <span className="text-[10px] font-black text-zinc-600 uppercase">Vezes:</span>
+                                <input type="number" min="2" value={installments} onChange={e => setInstallments(e.target.value)} className="w-12 bg-transparent text-white font-bold text-center outline-none" />
+                            </div>
+                        )}
+                    </div>
+
+                    <button disabled={loading} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2rem] font-bold uppercase tracking-[0.2em] transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-indigo-900/20 active:scale-[0.98]">
+                      {loading ? 'Processando...' : <>{'Confirmar Lançamento'} <ArrowRight size={18}/></>}
+                    </button>
+                </form>
+            </div>
+          ) : (
+            <div className="space-y-4">
+                <div className="flex items-center justify-between px-2 mb-4">
+                    <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <History size={14} /> Detalhamento de Itens
+                    </h3>
                 </div>
-                <p className="text-xs font-bold text-zinc-300 uppercase tracking-tighter">Arraste seu extrato</p>
-                <p className="text-[10px] text-zinc-600 mt-2">Suporta .CSV ou .OFX</p>
-              </div>
-
-              <div className="mt-8 space-y-4">
-                 <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                    <p className="text-[11px] text-zinc-400 leading-relaxed italic">
-                        "O sistema aprende com seus lançamentos manuais para categorizar automaticamente suas importações."
-                    </p>
-                 </div>
-              </div>
+                {items.length === 0 ? (
+                    <div className="p-20 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
+                        <p className="text-zinc-600 text-sm italic">Nenhum gasto registrado nesta fatura.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                        {items.map(item => (
+                            <div key={item.id} className="group p-5 bg-zinc-900/30 border border-white/5 rounded-3xl flex items-center justify-between hover:border-indigo-500/30 transition-all">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-12 h-12 bg-zinc-950 rounded-2xl flex flex-col items-center justify-center border border-white/5">
+                                        <span className="text-[9px] font-black text-indigo-500 uppercase">{new Date(item.created_at).toLocaleString('pt-BR', {month: 'short'})}</span>
+                                        <span className="text-sm font-bold text-white">{new Date(item.created_at).getDate()}</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white tracking-tight">{item.description}</p>
+                                        <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-md border border-white/5">{item.category}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-6">
+                                    <span className="text-sm font-black text-white">{formatCurrency(item.amount)}</span>
+                                    <button onClick={() => handleDeleteItem(item.id)} className="p-2 text-zinc-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
+          )}
+        </div>
 
-            <div className="text-center">
-                <span className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">Secure Cloud Storage</span>
+        <div className="p-8 border-t border-white/5 bg-zinc-950 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Sincronizado via Supabase</p>
             </div>
-          </div>
-
+            <span className="text-[10px] text-zinc-700 font-medium tracking-tight">V 2.5.0</span>
         </div>
       </div>
     </div>
