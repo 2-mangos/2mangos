@@ -25,11 +25,9 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
       const lastDay = new Date(selectedYear, selectedMonth + 1, 0).getDate()
       
       if (selectedMonth === -1) {
-          // Busca o ano inteiro
           startDate = `${selectedYear}-01-01T00:00:00.000Z`
           endDate = `${selectedYear}-12-31T23:59:59.999Z`
       } else {
-          // Busca o mês selecionado com limites claros
           startDate = `${selectedYear}-${monthStr}-01T00:00:00.000Z`
           endDate = `${selectedYear}-${monthStr}-${lastDay}T23:59:59.999Z`
       }
@@ -42,16 +40,22 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
     yearKpiData
   ] = await Promise.all([
     supabase.from('users').select('plano').eq('id', user.id).single(),
-    supabase.from('accounts').select('name, color').eq('user_id', user.id),
+    supabase.from('accounts').select('name, color, default_type').eq('user_id', user.id),
     supabase.from('expenses').select('*').eq('user_id', user.id).gte('date', startDate).lte('date', endDate).order('date', { ascending: true }),
     supabase.from('expenses').select('value, date').eq('user_id', user.id).gte('date', `${selectedYear === -1 ? today.getFullYear() : selectedYear}-01-01`).lte('date', `${selectedYear === -1 ? today.getFullYear() : selectedYear}-12-31`)
   ])
 
   const expenses = (expensesData.data as Expense[]) || []
   
-  const accountsMap: Record<string, string> = {}
+  // Mapa aprimorado para incluir o comportamento (default_type) da conta
+  const accountsConfig: Record<string, { color: string, default_type: string }> = {}
   if (accountsData.data) {
-    (accountsData.data as Account[]).forEach(acc => { accountsMap[acc.name] = acc.color || '#3b82f6' })
+    (accountsData.data as any[]).forEach(acc => { 
+      accountsConfig[acc.name] = { 
+        color: acc.color || '#3b82f6', 
+        default_type: acc.default_type || 'variavel' 
+      } 
+    })
   }
 
   let kpiTotalYear = 0
@@ -69,7 +73,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         <ExpensesClient 
             initialExpenses={expenses}
             kpiData={{ totalYear: kpiTotalYear, monthlyAverage: kpiMonthlyAverage }}
-            accountsMap={accountsMap}
+            accountsMap={accountsConfig as any}
             userPlan={userData.data?.plano || 'free'}
             selectedMonth={selectedMonth}
             selectedYear={selectedYear}

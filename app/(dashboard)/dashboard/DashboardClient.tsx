@@ -191,7 +191,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   useEffect(() => {
     if (selectedAccount) {
       startTransition(async () => {
-        // CORREÇÃO: Passando o mês selecionado para a busca de 12 meses
         const chartData = await getAccountYearlyData(selectedYear, selectedMonth, selectedAccount)
         setSpecificChartData(chartData)
       })
@@ -226,14 +225,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
   const dayCount = isCurrentMonth ? today.getDate() : daysInMonth
   const dailyAvg = data.ccTotal / (dayCount || 1)
   const projection = isCurrentMonth ? dailyAvg * daysInMonth : data.ccTotal
-  const limitUsedPercent = activeCreditLimit > 0 ? (data.ccTotal / activeCreditLimit) * 100 : 0
-  const limitAvailable = activeCreditLimit - data.ccTotal
   
-  let limitBarColor = 'bg-indigo-500'
-  if (limitUsedPercent > 100) limitBarColor = 'bg-red-600'
-  else if (limitUsedPercent > 80) limitBarColor = 'bg-red-500'
-  else if (limitUsedPercent > 50) limitBarColor = 'bg-yellow-500'
-
   const dynamicInsightText = useMemo(() => {
     if (selectedCcCategory) {
        const catVal = data.ccCategoryData.find(c => c.name === selectedCcCategory)?.value || 0
@@ -330,7 +322,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               <div className="flex items-start justify-between mb-4 shrink-0">
                   <div>
                     <h3 className="text-base font-semibold text-white">Perfil de Despesas</h3>
-                    {/* Rótulo corrigido para Últimos 12 meses */}
                     <p className="text-xs text-zinc-500">Últimos 12 meses</p>
                   </div>
               </div>
@@ -363,7 +354,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                           {data.expenseTypeBreakdown.fixed > 0 && (
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs pb-1 border-b border-white/5">
-                                    {/* Nomenclatura corrigida para Recorrentes */}
                                     <span className="text-indigo-400 font-bold flex items-center gap-1.5 uppercase tracking-wider">
                                        <span className="w-2 h-2 rounded-full bg-indigo-500"></span> Recorrentes
                                     </span>
@@ -500,7 +490,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
 
           <div className="card h-[440px] p-5">
             <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                {/* Rótulo corrigido para Últimos 12 meses */}
                 <div><h3 className="text-base font-semibold text-white">Fluxo Financeiro</h3><p className="text-xs text-zinc-500">Últimos 12 meses</p></div>
                 <div className="bg-zinc-900 border border-white/5 p-0.5 rounded-lg flex">
                     {[{ key: 'all', label: 'Tudo' }, { key: 'income', label: 'Receitas' }, { key: 'expense', label: 'Despesas' }].map((filter) => (
@@ -621,7 +610,6 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           
           <div className="card rounded-2xl p-5">
             <div className="mb-6 flex items-center justify-between">
-              {/* Rótulo corrigido para Últimos 12 meses */}
               <div><h3 className="text-base font-semibold text-white">Evolução por Categoria</h3><p className="text-xs text-zinc-500">Últimos 12 meses</p></div>
               <select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} className="text-xs border-white/10 rounded-lg py-1.5 px-3 bg-zinc-800 text-zinc-300 focus:ring-indigo-500 cursor-pointer hover:bg-zinc-700 outline-none">
                 {data.accountNames.map(name => (<option key={name} value={name}>{name}</option>))}
@@ -650,12 +638,13 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           </div>
       </div>
 
-      <div className="card rounded-2xl relative overflow-hidden flex flex-col md:flex-row min-h-[450px] mt-6">
+      {/* WIDGET FATURA ABERTA - ATUALIZADO */}
+      <div className="card rounded-2xl relative overflow-hidden flex flex-col md:flex-row h-[500px] mt-6 shadow-xl">
         {userProfile.plan === 'free' && <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center p-6"><div className="bg-zinc-800 p-3 rounded-full mb-3"><Lock className="text-yellow-400" size={20} /></div><h3 className="text-base font-bold text-white">Painel de Fatura Pro</h3><p className="text-xs text-zinc-400 mb-4 max-w-xs">Desbloqueie análises de projeção e insights.</p><button onClick={() => setShowUpgradeModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">Desbloquear Premium</button></div>}
 
-        <div className="w-full md:w-[40%] bg-zinc-900/30 border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col relative justify-between">
+        <div className="w-full md:w-[40%] bg-zinc-900/30 border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col relative justify-between overflow-hidden">
            
-           <div className="mb-4">
+           <div className="mb-4 shrink-0">
               <h3 className="text-base font-semibold text-white">
                  {selectedCcCategory ? `Foco: ${selectedCcCategory}` : 'Fatura Aberta'}
               </h3>
@@ -663,19 +652,8 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                 {selectedCcCategory ? 'Evolução diária' : 'Análise de impacto'}
               </p>
            </div>
-           
-           {activeCreditLimit > 0 && !selectedCcCategory && (
-             <div className="mt-2 bg-zinc-950/50 p-3 rounded-xl border border-white/5 animate-in fade-in slide-in-from-top-2">
-               <div className="flex justify-between items-end mb-2">
-                 <div><span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Comprometido</span><span className="text-xs font-bold text-white flex items-center gap-1">{limitUsedPercent.toFixed(1)}% <CreditCard size={10} className="text-zinc-600"/></span></div>
-                 <div className="text-right"><span className="text-[10px] font-bold text-zinc-500 uppercase block tracking-wider">Disponível</span><span className={`text-xs font-bold ${limitAvailable < 0 ? 'text-red-400' : 'text-emerald-400'}`}>{formatCurrency(limitAvailable)}</span></div>
-               </div>
-               <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1.5"><div className={`h-full rounded-full transition-all duration-700 ease-out ${limitBarColor}`} style={{ width: `${Math.min(limitUsedPercent, 100)}%` }}></div></div>
-               <div className="text-right"><span className="text-[9px] text-zinc-600">Total: {formatCurrency(activeCreditLimit)}</span></div>
-             </div>
-           )}
 
-           <div className="w-full h-[180px] my-4">
+           <div className="w-full h-[220px] my-4 flex-1">
              {selectedCcCategory ? (
                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={categoryDailyEvolution} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
@@ -707,19 +685,20 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
              )}
            </div>
 
-           <div className="mt-auto">
+           <div className="mt-auto shrink-0">
               <InsightBar text={dynamicInsightText} />
            </div>
            
         </div>
 
-        <div className="w-full md:w-[60%] p-6 flex flex-col h-full bg-zinc-900/10">
-           <div className="flex justify-between items-center mb-4">
+        <div className="w-full md:w-[60%] p-6 flex flex-col h-full bg-zinc-900/10 overflow-hidden">
+           <div className="flex justify-between items-center mb-4 shrink-0">
               <div><h3 className="text-base font-semibold text-white">Lançamentos da Fatura</h3><p className="text-xs text-zinc-500">Últimas movimentações</p></div>
               {selectedCcCategory && (
                 <button onClick={() => setSelectedCcCategory(null)} className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 hover:text-white bg-white/5 px-2 py-1 rounded transition-colors"><ArrowLeft size={10}/> VOLTAR</button>
               )}
            </div>
+           
            <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
               {selectedCcCategory ? (
                  getGroupedTransactions(selectedCcCategory).length > 0 ? (

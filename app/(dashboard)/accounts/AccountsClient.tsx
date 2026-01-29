@@ -122,7 +122,6 @@ function SortableAccountItem({ account, openEditModal, handleDelete, openMenuId,
                             : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
                         }`}>
                            {account.default_type === 'fixa' ? <CalendarClock size={10}/> : <Zap size={10}/>}
-                           {/* ALTERADO: Fixa -> Recorrente */}
                            {account.default_type === 'fixa' ? 'Recorrente' : 'Variável'}
                         </span>
 
@@ -303,23 +302,38 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
     }
 
     let error = null
-    let newIndex = !editingAccount && accounts.length > 0 ? accounts.length : editingAccount ? editingAccount.order_index : 0
     
     if (editingAccount) {
-      const { error: err } = await supabase.from('accounts').update(payload).eq('id', editingAccount.id)
-      error = err
+      // 1. Atualiza a conta em si
+      const { error: errAccount } = await supabase.from('accounts').update(payload).eq('id', editingAccount.id)
+      error = errAccount
+
+      // 2. Se o nome mudou, atualiza todas as despesas que usavam o nome antigo
+      if (!error && editingAccount.name !== formData.name) {
+          const { error: errExpenses } = await supabase
+            .from('expenses')
+            .update({ name: formData.name })
+            .eq('user_id', user.id)
+            .eq('name', editingAccount.name)
+          
+          if (errExpenses) {
+              console.error("Erro ao atualizar registros anteriores:", errExpenses.message)
+              // Opcional: addToast("Conta atualizada, mas houve erro nos registros antigos", 'warning')
+          }
+      }
     } else {
+      let newIndex = accounts.length
       const { error: err } = await supabase.from('accounts').insert({ user_id: user.id, order_index: newIndex, ...payload })
       error = err
     }
 
     if (error) addToast("Erro: " + error.message, 'error')
     else {
-        addToast(editingAccount ? "Atualizado com sucesso!" : "Categoria criada com sucesso!", 'success')
+        addToast(editingAccount ? "Atualizado e sincronizado com sucesso!" : "Categoria criada com sucesso!", 'success')
         setIsModalOpen(false)
         router.refresh()
     }
-  }
+}
 
   async function handleDelete(id: string) { 
     if (!confirm('Atenção: Isso excluirá todas as movimentações e lançamentos vinculados a esta conta. Continuar?')) return
@@ -464,7 +478,6 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                            }
                         `}
                     >
-                        {/* ALTERADO: Fixa -> Recorrente */}
                         <CalendarClock size={14} /> Recorrente
                     </button>
                 </div>
@@ -560,8 +573,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                     const isNowCard = !formData.is_credit_card
                     setFormData({
                         ...formData, 
-                        is_credit_card: isNowCard,
-                        ...(isNowCard ? { default_type: 'variavel' } : {})
+                        is_credit_card: isNowCard
                     })
                 }}
                 className={`
@@ -642,10 +654,6 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                                 />
                               </div>
                            </div>
-
-                           <p className="text-[10px] text-purple-300/60 mt-2 flex items-center gap-1">
-                             <Check size={10} /> Categoria definida automaticamente como <strong>Variável</strong>.
-                           </p>
                       </div>
                   )}
               </div>

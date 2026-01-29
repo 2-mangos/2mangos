@@ -31,7 +31,8 @@ const hexToRgba = (hex: string, alpha: number) => {
 interface ExpensesClientProps {
   initialExpenses: Expense[]
   kpiData: { totalYear: number, monthlyAverage: number }
-  accountsMap: Record<string, string>
+  // accountsMap atualizado para refletir as configurações da categoria
+  accountsMap: Record<string, { color: string, default_type: 'fixa' | 'variavel' }>
   userPlan: string
   selectedMonth: number
   selectedYear: number
@@ -106,7 +107,7 @@ export default function ExpensesClient({
 
     try {
       if (data.type === 'variavel') {
-        await supabase.from('expenses').insert({ 
+          await supabase.from('expenses').insert({ 
           user_id: user.id, 
           name: data.name, 
           value: data.value, 
@@ -245,7 +246,7 @@ export default function ExpensesClient({
     }
 
     if (error) {
-      addToast("Erro ao atualizar: " + error.message, 'error')
+      addToast("Erro ao atualizar", 'error')
     } else { 
       addToast("Atualizado com sucesso!", 'success')
       setEditingId(null)
@@ -358,10 +359,10 @@ export default function ExpensesClient({
                 </div>
             </div>
 
-            <div className="card overflow-hidden rounded-xl border border-white/5 p-0 flex flex-col h-[500px]">
+            <div className="card overflow-hidden rounded-xl border border-white/5 p-0 flex flex-col max-h-[580px]">
                 <div className="overflow-y-auto flex-1 custom-scrollbar">
-                    <table className="min-w-full divide-y divide-white/5">
-                        <thead className="bg-zinc-900/50 sticky top-0 z-10 backdrop-blur-md">
+    <table className="min-w-full divide-y divide-white/5">
+        <thead className="bg-zinc-900/50 sticky top-0 z-10 backdrop-blur-md">
                             <tr>
                                 <th className="px-6 py-3 w-10">
                                     <button onClick={handleSelectAll} className="text-zinc-500 hover:text-white">
@@ -380,8 +381,12 @@ export default function ExpensesClient({
                                 <tr><td colSpan={6} className="p-12 text-center text-zinc-500 text-xs">Nenhum lançamento no período.</td></tr>
                             ) : (
                                 filteredExpenses.map((expense) => {
-                                    const badgeColor = accountsMap[expense.name] || '#71717a'
+                                    // Sincronização direta com as configurações da conta
+                                    const accountConfig = accountsMap[expense.name]
+                                    const badgeColor = accountConfig?.color || '#71717a'
+                                    const displayType = accountConfig?.default_type || expense.type
                                     const isSelected = selectedIds.includes(expense.id)
+                                    
                                     return (
                                     <tr key={expense.id} className={`transition-colors group ${isSelected ? 'bg-indigo-500/5' : 'hover:bg-white/5'}`}>
                                         <td className="px-6 py-3">
@@ -398,7 +403,12 @@ export default function ExpensesClient({
                                                     {expense.is_credit_card && <CreditCard size={10} className="mr-1.5"/>}
                                                     {expense.name}
                                                 </span>
-                                                {expense.type === 'fixa' ? <span className={`${pillBaseClass} bg-blue-500/10 text-blue-400 border-blue-500/20`}>Recorrente</span> : <span className={`${pillBaseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>Variável</span>}
+                                                {/* Exibição dinâmica baseada na configuração da categoria */}
+                                                {displayType === 'fixa' ? (
+                                                    <span className={`${pillBaseClass} bg-blue-500/10 text-blue-400 border-blue-500/20`}>Recorrente</span>
+                                                ) : (
+                                                    <span className={`${pillBaseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>Variável</span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className={`px-6 py-3 text-xs font-bold ${expense.status === 'pago' ? 'text-zinc-400 line-through' : 'text-zinc-200'}`}>

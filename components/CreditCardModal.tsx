@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '../lib/supabase'
 import { 
   X, Trash2, Check, CreditCard, Tag, Calendar, 
-  LayoutGrid, ArrowRight, History, DollarSign
+  LayoutGrid, ArrowRight, History, DollarSign, AlertCircle
 } from 'lucide-react'
 import { formatCurrency } from '../lib/utils'
 import { useToast } from './ToastContext'
@@ -23,6 +23,7 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
   const router = useRouter()
   const supabase = createClient()
   
+  // Estados de UI e Form
   const [items, setItems] = useState<any[]>([])
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
@@ -34,11 +35,18 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
   const [totalInvoice, setTotalInvoice] = useState(0)
   const [activeTab, setActiveTab] = useState<'lancamento' | 'historico'>('lancamento')
 
+  // Estado para o Modal de Aviso de Exclusão
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; item: any }>({ 
+    show: false, 
+    item: null 
+  });
+
   const categories = [
     "Alimentação", "Lazer", "Mercado", "Transporte", "Saúde", 
     "Educação", "Serviços", "Compras", "Viagem", "Outros"
   ]
 
+  // Sincroniza o total da fatura com o banco e atualiza a lista
   const syncAndFetch = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -47,7 +55,7 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
       .from('card_transactions')
       .select('*')
       .eq('expense_id', expenseId)
-      .order('created_at', { ascending: false })
+      .order('transaction_date', { ascending: false })
 
     if (error) {
       addToast("Erro ao sincronizar dados", "error")
@@ -57,6 +65,7 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
     const list = transactions || []
     const newTotal = list.reduce((acc, curr) => acc + Number(curr.amount), 0)
 
+    // Atualiza o valor da despesa (fatura) pai no banco de dados
     await supabase.from('expenses').update({ value: newTotal }).eq('id', expenseId)
 
     setItems(list)
@@ -77,12 +86,13 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
     const { data: { user } } = await supabase.auth.getUser()
 
     try {
+      // Chamada ao RPC usando apenas a string da data (sem horas) para evitar erro de fuso
       const { error } = await supabase.rpc('create_card_transaction_manual', {
         p_user_id: user?.id,
         p_card_name: expenseName,
         p_description: desc,
         p_amount: parseFloat(amount.replace(',', '.')),
-        p_date: `${date}T12:00:00`,
+        p_date: date, 
         p_category: category,
         p_installments: isInstallment ? parseInt(installments) : 1
       })
@@ -100,14 +110,41 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
     }
   }
 
-  const handleDeleteItem = async (id: string) => {
-    if (!confirm("Remover este lançamento?")) return
+  // Função que decide se mostra o aviso ou apaga direto
+  const handleDeleteItem = (item: any) => {
+    if (item.installments_total && Number(item.installments_total) > 1) {
+      setDeleteConfirm({ show: true, item });
+    } else {
+      if (confirm("Remover este lançamento?")) {
+        executeDeletion(item.id, false);
+      }
+    }
+  }
+
+  const executeDeletion = async (idOrItem: any, isBulk: boolean) => {
+    setLoading(true);
     try {
-      await supabase.from('card_transactions').delete().eq('id', id)
-      addToast("Lançamento removido!", "success")
-      await syncAndFetch()
+      let query = supabase.from('card_transactions').delete();
+      
+      if (isBulk) {
+        // Apaga todas as parcelas com a mesma descrição e valor (comportamento de grupo)
+        query = query
+          .eq('description', idOrItem.description)
+          .eq('amount', idOrItem.amount);
+      } else {
+        query = query.eq('id', idOrItem);
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+
+      addToast(isBulk ? "Parcelamento removido com sucesso!" : "Lançamento removido!", "success");
+      setDeleteConfirm({ show: false, item: null });
+      await syncAndFetch();
     } catch (err: any) {
-      addToast("Erro ao remover", "error")
+      addToast("Erro ao remover", "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -143,7 +180,7 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
           </div>
         </div>
 
-        {/* NAVEGAÇÃO */}
+        {/* NAVEGAÇÃO / TABS */}
         <div className="flex px-8 border-b border-white/5 bg-zinc-900/10">
             <button onClick={() => setActiveTab('lancamento')} className={`px-6 py-4 text-xs font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'lancamento' ? 'border-indigo-500 text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
               Novo Lançamento
@@ -153,6 +190,7 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
             </button>
         </div>
 
+        {/* CONTEÚDO PRINCIPAL */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           {activeTab === 'lancamento' ? (
             <div className="w-full max-w-3xl mx-auto">
@@ -230,17 +268,24 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
                             <div key={item.id} className="group p-5 bg-zinc-900/30 border border-white/5 rounded-3xl flex items-center justify-between hover:border-indigo-500/30 transition-all">
                                 <div className="flex items-center gap-5">
                                     <div className="w-12 h-12 bg-zinc-950 rounded-2xl flex flex-col items-center justify-center border border-white/5">
-                                        <span className="text-[9px] font-black text-indigo-500 uppercase">{new Date(item.created_at).toLocaleString('pt-BR', {month: 'short'})}</span>
-                                        <span className="text-sm font-bold text-white">{new Date(item.created_at).getDate()}</span>
+                                        <span className="text-[9px] font-black text-indigo-500 uppercase">{new Date(item.transaction_date).toLocaleString('pt-BR', {month: 'short'})}</span>
+                                        <span className="text-sm font-bold text-white">{new Date(item.transaction_date).getUTCDate()}</span>
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-white tracking-tight">{item.description}</p>
+                                        <p className="text-sm font-bold text-white tracking-tight">
+                                            {item.description}
+                                            {item.installments_total > 1 && (
+                                                <span className="ml-2 text-[10px] text-indigo-400 font-black tracking-tighter">
+                                                    ({item.installment_number}/{item.installments_total})
+                                                </span>
+                                            )}
+                                        </p>
                                         <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-md border border-white/5">{item.category}</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-6">
                                     <span className="text-sm font-black text-white">{formatCurrency(item.amount)}</span>
-                                    <button onClick={() => handleDeleteItem(item.id)} className="p-2 text-zinc-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button onClick={() => handleDeleteItem(item)} className="p-2 text-zinc-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
                                         <Trash2 size={18} />
                                     </button>
                                 </div>
@@ -252,12 +297,50 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
           )}
         </div>
 
+        {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (AVISO) */}
+        {deleteConfirm.show && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in zoom-in duration-200">
+            <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl text-center">
+              <div className="flex justify-center mb-6">
+                <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500">
+                  <AlertCircle size={32} />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2 tracking-tight">Excluir Lançamento</h3>
+              <p className="text-zinc-400 text-sm mb-8 leading-relaxed">
+                Este item faz parte de uma compra em {deleteConfirm.item.installments_total}x. Como deseja prosseguir?
+              </p>
+              
+              <div className="space-y-3">
+                <button 
+                  onClick={() => executeDeletion(deleteConfirm.item.id, false)}
+                  className="w-full py-4 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl text-xs font-bold uppercase tracking-widest border border-white/5 transition-all"
+                >
+                  Excluir apenas esta parcela
+                </button>
+                <button 
+                  onClick={() => executeDeletion(deleteConfirm.item, true)}
+                  className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-rose-900/20"
+                >
+                  Excluir todo o parcelamento
+                </button>
+                <button 
+                  onClick={() => setDeleteConfirm({ show: false, item: null })}
+                  className="w-full py-4 bg-transparent text-zinc-500 hover:text-zinc-300 text-[10px] font-bold uppercase tracking-widest transition-all"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="p-8 border-t border-white/5 bg-zinc-950 flex justify-between items-center">
             <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500" />
                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Sincronizado via Supabase</p>
             </div>
-            <span className="text-[10px] text-zinc-700 font-medium tracking-tight">V 2.5.0</span>
+            <span className="text-[10px] text-zinc-700 font-medium tracking-tight">V 2.6.0</span>
         </div>
       </div>
     </div>
