@@ -23,11 +23,16 @@ export default async function IncomesPage({ searchParams }: { searchParams: Prom
       endDate = new Date(today.getFullYear() + 10, 11, 31).toISOString()
   } else {
       if (selectedMonth === -1) {
-          startDate = new Date(selectedYear, 0, 1).toISOString()
-          endDate = new Date(selectedYear, 11, 31, 23, 59, 59, 999).toISOString()
+          // Correção: Definição manual para evitar distorção de timezone
+          startDate = `${selectedYear}-01-01T00:00:00.000Z`
+          endDate = `${selectedYear}-12-31T23:59:59.999Z`
       } else {
-          startDate = new Date(selectedYear, selectedMonth, 1).toISOString()
-          endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59, 999).toISOString()
+          // Correção: Formatação do mês e cálculo do último dia com segurança
+          const month = String(selectedMonth + 1).padStart(2, '0');
+          const lastDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+          
+          startDate = `${selectedYear}-${month}-01T00:00:00.000Z`;
+          endDate = `${selectedYear}-${month}-${lastDay}T23:59:59.999Z`;
       }
   }
 
@@ -43,7 +48,6 @@ export default async function IncomesPage({ searchParams }: { searchParams: Prom
   const incomes = (incomesData as Income[]) || []
 
   // 3. Query KPI Anual (Fluxo Financeiro)
-  // Sempre pega o ano selecionado (ou atual se for 'Todos') para mostrar o acumulado do ano
   const kpiYear = selectedYear === -1 ? today.getFullYear() : selectedYear
   const kpiStart = `${kpiYear}-01-01`
   const kpiEnd = `${kpiYear}-12-31`

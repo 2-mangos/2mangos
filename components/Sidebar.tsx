@@ -51,7 +51,7 @@ export function Sidebar() {
           <div className="flex items-center justify-center w-8 h-8 text-white rounded-lg shadow-lg shadow-indigo-500/20 bg-indigo-600">
             <Wallet size={16} strokeWidth={2.5} />
           </div>
-          <span className="text-[15px]">Finance SaaS</span>
+          <span className="text-[15px]">2mangos</span>
         </div>
       </div>
 

@@ -42,7 +42,16 @@ export interface CreateExpenseDTO {
   is_fixed_value?: boolean;
 }
 
-// Interface adicionada para resolver o erro de exportação
+// Interface para Receitas (Incomes)
+export interface Income {
+  id: string;
+  user_id: string;
+  description: string;
+  amount: number;
+  date: string;
+  created_at?: string;
+}
+
 export interface CardTransaction {
   id: string;
   expense_id: string;

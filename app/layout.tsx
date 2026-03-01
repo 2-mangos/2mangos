@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Finance SaaS",
+  title: "2mangos",
   description: "Gestão financeira inteligente",
 };
 
