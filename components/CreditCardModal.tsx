@@ -85,13 +85,23 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
+    if (!user) {
+        addToast("Sessão expirada", "error")
+        setLoading(false)
+        return
+    }
+
     try {
-      // Chamada ao RPC usando apenas a string da data (sem horas) para evitar erro de fuso
+      // CORREÇÃO: Limpeza robusta do valor para o PostgreSQL
+      const cleanAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'))
+
+      if (isNaN(cleanAmount)) throw new Error("Valor inválido")
+
       const { error } = await supabase.rpc('create_card_transaction_manual', {
-        p_user_id: user?.id,
+        p_user_id: user.id,
         p_card_name: expenseName,
         p_description: desc,
-        p_amount: parseFloat(amount.replace(',', '.')),
+        p_amount: cleanAmount,
         p_date: date, 
         p_category: category,
         p_installments: isInstallment ? parseInt(installments) : 1
@@ -110,7 +120,6 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
     }
   }
 
-  // Função que decide se mostra o aviso ou apaga direto
   const handleDeleteItem = (item: any) => {
     if (item.installments_total && Number(item.installments_total) > 1) {
       setDeleteConfirm({ show: true, item });
@@ -127,10 +136,9 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
       let query = supabase.from('card_transactions').delete();
       
       if (isBulk) {
-        // Apaga todas as parcelas com a mesma descrição e valor (comportamento de grupo)
         query = query
           .eq('description', idOrItem.description)
-          .eq('amount', idOrItem.amount);
+          .eq('installments_total', idOrItem.installments_total);
       } else {
         query = query.eq('id', idOrItem);
       }
@@ -138,7 +146,7 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
       const { error } = await query;
       if (error) throw error;
 
-      addToast(isBulk ? "Parcelamento removido com sucesso!" : "Lançamento removido!", "success");
+      addToast(isBulk ? "Parcelamento removido!" : "Lançamento removido!", "success");
       setDeleteConfirm({ show: false, item: null });
       await syncAndFetch();
     } catch (err: any) {
@@ -246,7 +254,7 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
                         )}
                     </div>
 
-                    <button disabled={loading} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2rem] font-bold uppercase tracking-[0.2em] transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-indigo-900/20 active:scale-[0.98]">
+                    <button disabled={loading} className="w-full py-5 bg-indigo-600 hover:bg-indigo-50 text-white rounded-[2rem] font-bold uppercase tracking-[0.2em] transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-indigo-900/20 active:scale-[0.98]">
                       {loading ? 'Processando...' : <>{'Confirmar Lançamento'} <ArrowRight size={18}/></>}
                     </button>
                 </form>
@@ -340,7 +348,7 @@ export default function CreditCardModal({ isOpen, onClose, expenseId, expenseNam
                 <div className="w-2 h-2 rounded-full bg-indigo-500" />
                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Sincronizado via Supabase</p>
             </div>
-            <span className="text-[10px] text-zinc-700 font-medium tracking-tight">V 2.6.0</span>
+            <span className="text-[10px] text-zinc-700 font-medium tracking-tight">V 2.7.5</span>
         </div>
       </div>
     </div>
