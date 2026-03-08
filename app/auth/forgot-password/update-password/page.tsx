@@ -10,17 +10,27 @@ export default function UpdatePasswordPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Ao carregar, verifica se tem sessão (o link do email loga o usuário automaticamente)
   useEffect(() => {
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    // Monitoriza mudanças na autenticação para capturar o modo de recuperação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // Usuário está no modo de recuperação
+        console.log('Modo de recuperação de senha ativo.')
       }
     })
-  }, [])
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase.auth])
 
   async function handleUpdate() {
+    if (!password || password.length < 6) {
+      alert('A senha deve ter pelo menos 6 caracteres.')
+      return
+    }
+
     setLoading(true)
+    // Atualiza a senha do utilizador autenticado via link de recuperação
     const { error } = await supabase.auth.updateUser({ password: password })
 
     if (error) {
@@ -49,13 +59,14 @@ export default function UpdatePasswordPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               placeholder="••••••"
+              minLength={6}
             />
           </div>
 
           <button
             onClick={handleUpdate}
             disabled={loading}
-            className="flex w-full justify-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex w-full justify-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Atualizando...' : 'Confirmar Nova Senha'}
           </button>

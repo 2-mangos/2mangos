@@ -11,9 +11,10 @@ export default function ForgotPasswordPage() {
 
   async function handleReset() {
     setLoading(true)
-    // Redireciona para uma página de atualização (que faremos depois)
+    
+    // O redirectTo deve apontar para o caminho exato onde está o arquivo update-password/page.tsx
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/update-password`,
+      redirectTo: `${window.location.origin}/auth/forgot-password/update-password`,
     })
 
     if (error) {
@@ -41,13 +42,14 @@ export default function ForgotPasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               placeholder="seu@email.com"
+              required
             />
           </div>
 
           <button
             onClick={handleReset}
             disabled={loading}
-            className="flex w-full justify-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex w-full justify-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Enviando...' : 'Enviar Link'}
           </button>
