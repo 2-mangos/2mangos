@@ -174,7 +174,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
              <div className="bg-zinc-900 border border-white/5 flex items-center p-1 rounded-lg">
                 <div className="flex items-center gap-2 px-3 border-r border-white/5">
                    <Calendar size={14} className="text-emerald-400"/>
-                   {/* VOCABULÁRIO: PERÍODO */}
                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Período</span>
                 </div>
                 <select 
@@ -208,7 +207,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={cardClass}>
                 <div>
-                    {/* VOCABULÁRIO: RECEITAS / BUSCA */}
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
                         {searchTerm ? 'Busca' : 'Receitas'}
                     </p>
@@ -224,13 +222,11 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
 
             <div className={cardClass}>
                 <div>
-                    {/* VOCABULÁRIO: FLUXO FINANCEIRO */}
                     <p className="text-xs font-bold text-zinc-500 mb-1 uppercase tracking-wider">
                         Fluxo Financeiro
                     </p>
                     <h3 className="text-2xl font-bold text-white tracking-tight">{formatCurrency(kpiData.totalYear)}</h3>
                 </div>
-                {/* Ícone de Carteira para Fluxo */}
                 <div className="absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-zinc-400">
                     <Wallet size={18}/>
                 </div>
@@ -252,11 +248,10 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
             </div>
         </div>
 
-        {/* TABELA DE DADOS */}
+        {/* TABELA DE DADOS COM SCROLL INTERNO */}
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    {/* VOCABULÁRIO: MOVIMENTAÇÕES */}
                     <h3 className="text-base font-bold text-white">Movimentações</h3>
                     
                     {selectedIds.length > 0 && (
@@ -281,7 +276,8 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                 </div>
             </div>
 
-            <div className="card overflow-hidden rounded-xl border border-white/5 p-0 flex flex-col h-[500px]">
+            {/* Container atualizado para suportar scroll interno igual ao de despesas */}
+            <div className="card overflow-hidden rounded-xl border border-white/5 p-0 flex flex-col max-h-[580px]">
                 <div className="overflow-y-auto flex-1 custom-scrollbar">
                     <table className="min-w-full divide-y divide-white/5">
                         <thead className="bg-zinc-900/50 sticky top-0 z-10 backdrop-blur-md">
@@ -295,9 +291,7 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                                         )}
                                     </button>
                                 </th>
-                                {/* VOCABULÁRIO: DATA */}
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Data</th>
-                                {/* VOCABULÁRIO: CATEGORIA / DESCRIÇÃO */}
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Descrição / Categoria</th>
                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Valor</th>
                                 <th className="px-6 py-3 text-right text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ações</th>
@@ -370,7 +364,6 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
            <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-zinc-500">
               <div className="flex items-center gap-2">
                 <ListFilter size={14} />
-                {/* VOCABULÁRIO: LANÇAMENTOS */}
                 <span>Exibindo <strong className="text-zinc-300">{filteredIncomes.length}</strong> Lançamentos</span>
               </div>
               <div className="hidden sm:block">

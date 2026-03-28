@@ -389,49 +389,70 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               </div>
           </div>
 
-          {activeBudgets.length > 0 && (
-             <div className="card p-5 flex flex-col">
-                <div className="flex items-center justify-between mb-4 shrink-0">
-                    <div>
-                        <h3 className="text-base font-semibold text-white">Metas</h3>
-                        <p className="text-xs text-zinc-500">Orçamento por categoria</p>
-                    </div>
+          <div className="card p-5 flex flex-col relative overflow-hidden">
+             {/* Overlay de Bloqueio para versão Free */}
+             {userProfile.plan === 'free' && (
+                <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center p-6">
+                   <div className="bg-zinc-800 p-3 rounded-full mb-3">
+                      <Lock className="text-yellow-400" size={20} />
+                   </div>
+                   <h3 className="text-base font-bold text-white">Painel de Metas Pro</h3>
+                   <p className="text-xs text-zinc-400 mb-4 max-w-xs">Desbloqueie o acompanhamento de orçamentos.</p>
+                   <button onClick={() => setShowUpgradeModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">
+                      Desbloquear Premium
+                   </button>
                 </div>
+             )}
 
-                <div className="grid grid-cols-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 px-1 shrink-0">
-                    <span>Categoria</span>
-                    <span className="text-center">Meta</span>
-                    <span className="text-right">Realizado</span>
-                </div>
-                
-                <div className="overflow-y-auto custom-scrollbar pr-1 space-y-0.5 h-[195px]">
-                    {activeBudgets.map((item, idx) => (
-                        <div key={idx} className="grid grid-cols-3 items-center py-2.5 border-b border-white/5 last:border-0 hover:bg-white/5 px-1 rounded-lg transition-colors">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
-                                <span className="text-xs font-medium text-zinc-200 truncate" title={item.name}>
-                                    {item.name}
-                                    {item.is_card && <CreditCard size={10} className="inline ml-1 text-purple-400"/>}
-                                </span>
-                            </div>
-                            <div className="text-center text-xs text-zinc-400">
-                                {formatCurrency(item.budget)}
-                            </div>
-                            <div className="text-right flex items-center justify-end gap-1.5">
-                                <span className={`text-xs font-bold ${item.isOver ? 'text-red-400' : 'text-emerald-400'}`}>
-                                    {formatCurrency(item.spend)}
-                                </span>
-                                {item.isOver && (
-                                    <Tooltip content="Limite excedido!">
-                                        <AlertCircle size={12} className="text-red-500 animate-pulse" />
-                                    </Tooltip>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+             <div className="flex items-center justify-between mb-4 shrink-0">
+                 <div>
+                     <h3 className="text-base font-semibold text-white">Metas</h3>
+                     <p className="text-xs text-zinc-500">Orçamento por categoria</p>
+                 </div>
              </div>
-          )}
+
+             {activeBudgets.length > 0 ? (
+                <>
+                   <div className="grid grid-cols-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 px-1 shrink-0">
+                       <span>Categoria</span>
+                       <span className="text-center">Meta</span>
+                       <span className="text-right">Realizado</span>
+                   </div>
+                   
+                   <div className="overflow-y-auto custom-scrollbar pr-1 space-y-0.5 h-[195px]">
+                       {activeBudgets.map((item, idx) => (
+                           <div key={idx} className="grid grid-cols-3 items-center py-2.5 border-b border-white/5 last:border-0 hover:bg-white/5 px-1 rounded-lg transition-colors">
+                               <div className="flex items-center gap-2 min-w-0">
+                                   <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
+                                   <span className="text-xs font-medium text-zinc-200 truncate" title={item.name}>
+                                       {item.name}
+                                       {item.is_card && <CreditCard size={10} className="inline ml-1 text-purple-400"/>}
+                                   </span>
+                               </div>
+                               <div className="text-center text-xs text-zinc-400">
+                                   {formatCurrency(item.budget)}
+                               </div>
+                               <div className="text-right flex items-center justify-end gap-1.5">
+                                   <span className={`text-xs font-bold ${item.isOver ? 'text-red-400' : 'text-emerald-400'}`}>
+                                       {formatCurrency(item.spend)}
+                                   </span>
+                                   {item.isOver && (
+                                       <Tooltip content="Limite excedido!">
+                                           <AlertCircle size={12} className="text-red-500 animate-pulse" />
+                                       </Tooltip>
+                                   )}
+                               </div>
+                           </div>
+                       ))}
+                   </div>
+                </>
+             ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 gap-3">
+                   <Target size={32} className="opacity-30" />
+                   <p className="text-[10px] text-center max-w-[150px]">Configure limites mensais nas suas contas para acompanhar aqui.</p>
+                </div>
+             )}
+          </div>
 
         </div>
 
@@ -638,7 +659,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
           </div>
       </div>
 
-      {/* WIDGET FATURA ABERTA - ATUALIZADO */}
+      {/* WIDGET FATURA ABERTA */}
       <div className="card rounded-2xl relative overflow-hidden flex flex-col md:flex-row h-[500px] mt-6 shadow-xl">
         {userProfile.plan === 'free' && <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center p-6"><div className="bg-zinc-800 p-3 rounded-full mb-3"><Lock className="text-yellow-400" size={20} /></div><h3 className="text-base font-bold text-white">Painel de Fatura Pro</h3><p className="text-xs text-zinc-400 mb-4 max-w-xs">Desbloqueie análises de projeção e insights.</p><button onClick={() => setShowUpgradeModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">Desbloquear Premium</button></div>}
 
@@ -730,7 +751,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
         </div>
       </div>
 
-      {/* RODA PÉ */}
+      {/* RODAPÉ */}
       <div className="mt-8 border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
               <div className="w-6 h-6 bg-indigo-500/20 rounded-lg flex items-center justify-center text-indigo-400">

@@ -31,7 +31,6 @@ const hexToRgba = (hex: string, alpha: number) => {
 interface ExpensesClientProps {
   initialExpenses: Expense[]
   kpiData: { totalYear: number, monthlyAverage: number }
-  // accountsMap atualizado para refletir as configurações da categoria
   accountsMap: Record<string, { color: string, default_type: 'fixa' | 'variavel' }>
   userPlan: string
   selectedMonth: number
@@ -271,6 +270,7 @@ export default function ExpensesClient({
 
   return (
     <div className="space-y-8 pb-16 animate-in fade-in duration-500">
+        {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Lançamentos</h1>
@@ -298,6 +298,7 @@ export default function ExpensesClient({
           </div>
         </div>
 
+        {/* KPI CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={cardClass}>
                 <div>
@@ -330,6 +331,7 @@ export default function ExpensesClient({
             </div>
         </div>
 
+        {/* TABELA COM AJUSTE DE SCROLL NO 11º ITEM */}
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -359,10 +361,10 @@ export default function ExpensesClient({
                 </div>
             </div>
 
-            <div className="card overflow-hidden rounded-xl border border-white/5 p-0 flex flex-col max-h-[580px]">
+            <div className="card overflow-hidden rounded-xl border border-white/5 p-0 flex flex-col max-h-[590px]">
                 <div className="overflow-y-auto flex-1 custom-scrollbar">
-    <table className="min-w-full divide-y divide-white/5">
-        <thead className="bg-zinc-900/50 sticky top-0 z-10 backdrop-blur-md">
+                    <table className="min-w-full divide-y divide-white/5">
+                        <thead className="bg-zinc-900/50 sticky top-0 z-10 backdrop-blur-md">
                             <tr>
                                 <th className="px-6 py-3 w-10">
                                     <button onClick={handleSelectAll} className="text-zinc-500 hover:text-white">
@@ -381,7 +383,6 @@ export default function ExpensesClient({
                                 <tr><td colSpan={6} className="p-12 text-center text-zinc-500 text-xs">Nenhum lançamento no período.</td></tr>
                             ) : (
                                 filteredExpenses.map((expense) => {
-                                    // Sincronização direta com as configurações da conta
                                     const accountConfig = accountsMap[expense.name]
                                     const badgeColor = accountConfig?.color || '#71717a'
                                     const displayType = accountConfig?.default_type || expense.type
@@ -403,7 +404,6 @@ export default function ExpensesClient({
                                                     {expense.is_credit_card && <CreditCard size={10} className="mr-1.5"/>}
                                                     {expense.name}
                                                 </span>
-                                                {/* Exibição dinâmica baseada na configuração da categoria */}
                                                 {displayType === 'fixa' ? (
                                                     <span className={`${pillBaseClass} bg-blue-500/10 text-blue-400 border-blue-500/20`}>Recorrente</span>
                                                 ) : (
@@ -446,6 +446,7 @@ export default function ExpensesClient({
             </div>
         </div>
 
+        {/* FOOTER BAR */}
         <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur border-t border-white/5 p-3 md:pl-64 z-40">
            <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-zinc-500">
               <div className="flex items-center gap-2">
@@ -460,7 +461,7 @@ export default function ExpensesClient({
 
         {recurrenceModalOpen && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div className="w-full max-w-sm bg-zinc-900 rounded-2xl border border-white/10 shadow-2xl p-6 space-y-4">
+                <div className="w-full max-sm bg-zinc-900 rounded-2xl border border-white/10 shadow-2xl p-6 space-y-4">
                     <div className="flex items-start gap-4">
                         <div className="bg-blue-500/10 p-3 rounded-full text-blue-400"><Repeat size={24} /></div>
                         <div>
