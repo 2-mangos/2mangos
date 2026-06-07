@@ -367,7 +367,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs pb-1 border-b border-white/5">
                                     <span className="text-rose-400 font-bold flex items-center gap-1.5 uppercase tracking-wider">
-                                        <span className="w-2 h-2 rounded-full bg-rose-500"></span> Variáveis
+                                         <span className="w-2 h-2 rounded-full bg-rose-500"></span> Variáveis
                                     </span>
                                     <span className="text-[10px] text-zinc-500">{((data.expenseTypeBreakdown.variable / data.currentMonthTotal) * 100).toFixed(0)}%</span>
                                 </div>
@@ -433,15 +433,10 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
                                    {formatCurrency(item.budget)}
                                </div>
                                <div className="text-right flex items-center justify-end gap-1.5">
-                                   <span className={`text-xs font-bold ${item.isOver ? 'text-red-400' : 'text-emerald-400'}`}>
-                                       {formatCurrency(item.spend)}
-                                   </span>
-                                   {item.isOver && (
-                                       <Tooltip content="Limite excedido!">
-                                           <AlertCircle size={12} className="text-red-500 animate-pulse" />
-                                       </Tooltip>
-                                   )}
-                               </div>
+    <span className={`text-xs font-bold ${item.isOver ? 'text-red-400' : 'text-emerald-400'}`}>
+        {formatCurrency(item.spend)}
+    </span>
+</div>
                            </div>
                        ))}
                    </div>
@@ -509,7 +504,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               <InsightBar text={miniInsight} />
           </div>
 
-          <div className="card h-[440px] p-5">
+          <div className="card h-[440px] w-full p-5">
             <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div><h3 className="text-base font-semibold text-white">Fluxo Financeiro</h3><p className="text-xs text-zinc-500">Últimos 12 meses</p></div>
                 <div className="bg-zinc-900 border border-white/5 p-0.5 rounded-lg flex">
@@ -722,30 +717,30 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
            
            <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
               {selectedCcCategory ? (
-                 getGroupedTransactions(selectedCcCategory).length > 0 ? (
-                   getGroupedTransactions(selectedCcCategory).map((t, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-zinc-900/40 hover:bg-zinc-800/60 transition-colors">
-                       <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400"><DollarSign size={14} /></div>
-                          <div><p className="text-xs font-medium text-zinc-200">{t.description}</p><p className="text-[10px] text-zinc-500">{formatDate(t.created_at)}</p></div>
-                       </div>
-                       <span className="text-xs font-bold text-white">{formatCurrency(t.amount)}</span>
-                    </div>
-                   ))
-                 ) : <div className="text-center text-zinc-600 py-10 text-xs">Nenhum lançamento encontrado.</div>
+                  getGroupedTransactions(selectedCcCategory).length > 0 ? (
+                    getGroupedTransactions(selectedCcCategory).map((t, i) => (
+                     <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-zinc-900/40 hover:bg-zinc-800/60 transition-colors">
+                        <div className="flex items-center gap-3">
+                           <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400"><DollarSign size={14} /></div>
+                           <div><p className="text-xs font-medium text-zinc-200">{t.description}</p><p className="text-[10px] text-zinc-500">{formatDate(t.created_at)}</p></div>
+                        </div>
+                        <span className="text-xs font-bold text-white">{formatCurrency(t.amount)}</span>
+                     </div>
+                    ))
+                  ) : <div className="text-center text-zinc-600 py-10 text-xs">Nenhum lançamento encontrado.</div>
               ) : (
-                 data.ccCategoryData.map((cat, i) => (
-                    <div key={i} onClick={() => setSelectedCcCategory(cat.name)} className="group flex items-center justify-between p-3 rounded-lg border border-white/5 bg-zinc-900/40 hover:bg-zinc-800/60 hover:border-indigo-500/30 cursor-pointer transition-all">
-                       <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${i === 0 ? 'bg-indigo-500/20 text-indigo-400' : 'bg-zinc-800 text-zinc-400 group-hover:bg-indigo-500/10 group-hover:text-indigo-400'}`}><CreditCard size={14} /></div>
-                          <div><p className="text-xs font-medium text-zinc-200 group-hover:text-white transition-colors">{cat.name}</p><p className="text-[10px] text-zinc-500 group-hover:text-indigo-300 transition-colors">Ver detalhes</p></div>
-                       </div>
-                       <div className="text-right">
-                          <span className="text-xs font-bold text-white block">{formatCurrency(cat.value)}</span>
-                          <span className="text-[10px] text-zinc-500 group-hover:text-indigo-300 transition-colors flex items-center justify-end gap-1">Detalhes <ChevronRight size={8}/></span>
-                       </div>
-                    </div>
-                 ))
+                  data.ccCategoryData.map((cat, i) => (
+                     <div key={i} onClick={() => setSelectedCcCategory(cat.name)} className="group flex items-center justify-between p-3 rounded-lg border border-white/5 bg-zinc-900/40 hover:bg-zinc-800/60 hover:border-indigo-500/30 cursor-pointer transition-all">
+                        <div className="flex items-center gap-3">
+                           <div className="w-8 h-8 rounded-full flex items-center justify-center transition-colors ${i === 0 ? 'bg-indigo-500/20 text-indigo-400' : 'bg-zinc-800 text-zinc-400 group-hover:bg-indigo-500/10 group-hover:text-indigo-400'}"><CreditCard size={14} /></div>
+                           <div><p className="text-xs font-medium text-zinc-200 group-hover:text-white transition-colors">{cat.name}</p><p className="text-[10px] text-zinc-500 group-hover:text-indigo-300 transition-colors">Ver detalhes</p></div>
+                        </div>
+                        <div className="text-right">
+                           <span className="text-xs font-bold text-white block">{formatCurrency(cat.value)}</span>
+                           <span className="text-[10px] text-zinc-500 group-hover:text-indigo-300 transition-colors flex items-center justify-end gap-1">Detalhes <ChevronRight size={8}/></span>
+                        </div>
+                     </div>
+                  ))
               )}
            </div>
         </div>
@@ -757,7 +752,7 @@ export default function DashboardClient({ data, userProfile, selectedMonth, sele
               <div className="w-6 h-6 bg-indigo-500/20 rounded-lg flex items-center justify-center text-indigo-400">
                   <span className="font-bold text-xs">B</span>
               </div>
-              <p className="text-xs text-zinc-500">© 2024 Meu Bleu. Financeiro Inteligente.</p>
+              <p className="text-xs text-zinc-500">© 2026 2 Mangos. Todos os direitos reservados.</p>
           </div>
 
           <div className="flex items-center gap-6">

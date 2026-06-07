@@ -226,24 +226,23 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
   }
 
   async function saveOrderToSupabase(updatedAccounts: Account[]) { 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const updates = updatedAccounts.map((acc, index) => ({ 
-        id: acc.id, 
-        user_id: user.id, 
-        name: acc.name, 
-        is_credit_card: acc.is_credit_card, 
-        color: acc.color, 
-        order_index: index, 
-        credit_limit: acc.credit_limit,
-        monthly_budget: acc.monthly_budget, 
-        icon: acc.icon,
-        default_type: acc.default_type,
-        closing_day: acc.closing_day,
-        due_day: acc.due_day
-    }))
-    await supabase.from('accounts').upsert(updates) 
-    router.refresh()
+    try {
+      // CORREÇÃO #6: Executa atualizações paralelas apenas no campo order_index, removendo o risco de race condition e a chamada ao getUser()
+      const updatePromises = updatedAccounts.map((acc, index) => 
+        supabase
+          .from('accounts')
+          .update({ order_index: index })
+          .eq('id', acc.id)
+      )
+
+      // Aguarda todas as atualizações parciais terminarem no banco
+      await Promise.all(updatePromises)
+      
+      router.refresh()
+    } catch (err) {
+      console.error("Erro ao salvar nova ordenação de contas:", err)
+      addToast("Não foi possível salvar a nova ordem das categorias.", 'error')
+    }
   }
 
   function openNewModal() { 
