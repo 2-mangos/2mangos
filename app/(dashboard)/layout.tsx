@@ -1,5 +1,5 @@
-import { Sidebar } from "@/components/Sidebar"; // IMPORTANTE: Com chavetas
-import Header from "@/components/Header"; // Header geralmente é default, se der erro nele, use { Header }
+import { Sidebar } from "@/components/Sidebar";
+import Header from "@/components/Header";
 
 export default function DashboardLayout({
   children,
@@ -7,11 +7,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen w-screen max-w-full overflow-x-hidden bg-[#09090b]">
+      {/* Sidebar injetada lateralmente */}
       <Sidebar />
-      <main className="flex-1 flex flex-col md:ml-[240px] transition-all duration-300 ease-in-out">
+      
+      {/* Bloco main contido eletronicamente para não estourar em flex-box */}
+      <main className="flex-1 flex flex-col md:ml-[240px] transition-all duration-300 ease-in-out min-w-0 max-w-full overflow-x-hidden">
         <Header />
-        <div className="flex-1 overflow-x-hidden p-6">
+        
+        {/* Container do Dashboard adaptável */}
+        <div className="flex-1 p-4 sm:p-5 md:p-6 lg:p-8 max-w-full overflow-x-hidden">
           {children}
         </div>
       </main>

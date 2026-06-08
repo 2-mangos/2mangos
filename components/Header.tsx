@@ -62,7 +62,7 @@ export default function Header() {
   }
 
   return (
-    <header className="h-16 bg-[#09090b]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-end px-8 sticky top-0 z-40">
+    <header className="h-16 bg-[#09090b]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-end px-4 pl-16 md:px-8 sticky top-0 z-30 w-full">
       <div className="flex items-center gap-6">
         <div className="relative" ref={menuRef}>
           <button 
@@ -89,7 +89,7 @@ export default function Header() {
           </button>
 
           {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-3 w-48 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl py-1 animate-in fade-in zoom-in-95 origin-top-right">
+            <div className="absolute right-0 top-full mt-3 w-48 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl py-1 animate-in fade-in zoom-in-95 origin-top-right z-50">
               <div className="px-4 py-3 border-b border-white/5 sm:hidden">
                 <p className="text-xs font-bold text-zinc-200">{userName}</p>
                 <p className="text-[10px] text-zinc-500 uppercase">{userPlan}</p>
