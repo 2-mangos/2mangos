@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Plus, Trash2, Search, DollarSign, X, Save, MoreVertical, Edit2, 
-  TrendingUp, Calendar, Wallet, ListFilter, Square, SquareCheck 
+  TrendingUp, Calendar, Wallet, ListFilter, Square, SquareCheck,
+  ArrowRight, ArrowUpRight, CheckCircle2, AlertCircle
 } from 'lucide-react'
 
 import { createClient } from '../../../lib/supabase'
@@ -12,13 +13,14 @@ import { useToast } from '../../../components/ToastContext'
 import { Income } from '../../../lib/types'
 import { formatCurrency, formatDate } from '../../../lib/utils'
 
-// Constantes
+// Constantes e Design System Premium
 const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 1 + i)
-const pillBaseClass = "inline-flex items-center justify-center rounded-md px-2 py-1 text-[10px] font-bold whitespace-nowrap transition-colors border"
-const cardClass = "card relative p-5 flex flex-col justify-between h-auto min-h-[112px] md:min-h-[160px]"
-const iconBadgeClass = "absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-emerald-400"
+const pillBaseClass = "inline-flex items-center justify-center rounded-md px-2.5 py-1 text-[10px] font-bold whitespace-nowrap transition-all border shadow-sm"
+const cardClass = "card relative p-5 sm:p-6 flex flex-col justify-between h-auto min-h-[120px] md:min-h-[140px] overflow-hidden"
+const iconBadgeClass = "absolute top-5 right-5 w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10"
 
+// CORREÇÃO 1: Interface adicionada novamente para o TypeScript não reclamar
 interface IncomesClientProps {
   initialIncomes: Income[]
   kpiData: {
@@ -58,13 +60,12 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Filtro Local (Busca)
-  const filteredIncomes = initialIncomes.filter(inc => 
+  // CORREÇÃO 2: Tipagem explícita adicionada ao inc
+  const filteredIncomes = initialIncomes.filter((inc: Income) => 
     inc.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Cálculo Dinâmico do Total (Baseado no filtro)
-  const currentTableTotal = filteredIncomes.reduce((acc, curr) => acc + curr.amount, 0)
+  const currentTableTotal = filteredIncomes.reduce((acc: number, curr: Income) => acc + curr.amount, 0)
 
   function handleFilterChange(month: number, year: number) {
     router.push(`/incomes?month=${month}&year=${year}`)
@@ -72,7 +73,8 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
 
   function handleSelectAll() {
     if (selectedIds.length === filteredIncomes.length) setSelectedIds([])
-    else setSelectedIds(filteredIncomes.map(e => e.id))
+    // CORREÇÃO 3: Tipagem explícita adicionada ao e
+    else setSelectedIds(filteredIncomes.map((e: Income) => e.id))
   }
 
   function handleSelectOne(id: string) {
@@ -80,7 +82,7 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
     else setSelectedIds([...selectedIds, id])
   }
 
-  // --- CRUD OPERATIONS ---
+  // --- OPERAÇÕES CRUD ---
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -161,17 +163,22 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
   function handleToggleMenu(id: string) { setOpenMenuId(prev => prev === id ? null : id) }
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-20 animate-in fade-in duration-500">
+    <div className="space-y-6 sm:space-y-8 pb-24 animate-in fade-in duration-500 max-w-full overflow-x-hidden">
         
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-14 md:pt-0">
+        {/* =========================================================
+            HEADER PADRONIZADO COM GRADIENTE
+        ========================================================= */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-14 md:pt-0 pb-4 border-b border-white/5">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Receitas</h1>
-            <p className="text-zinc-400 mt-1 text-sm">Gerencie suas <strong className="text-zinc-300">Entradas</strong></p>
+            <p className="text-zinc-400 mt-1 text-sm flex items-center gap-2">
+               <TrendingUp size={14} className="text-emerald-400"/>
+               Gerencie e rastreie o fluxo de entrada financeira
+            </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-             <div className="bg-zinc-900/80 border border-white/10 flex items-center p-1.5 rounded-lg w-full sm:w-auto justify-between">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
+             <div className="bg-zinc-900/80 border border-white/10 flex items-center p-1.5 rounded-lg w-full sm:w-auto justify-between shadow-sm">
                 <div className="flex items-center gap-2 px-3 border-r border-white/10 shrink-0">
                    <Calendar size={14} className="text-emerald-400"/>
                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest hidden sm:block">Período</span>
@@ -181,7 +188,7 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                     onChange={(e) => handleFilterChange(parseInt(e.target.value), selectedYear)} 
                     className="bg-transparent text-zinc-200 text-sm font-medium py-1.5 px-3 flex-1 cursor-pointer outline-none [&>option]:bg-zinc-900"
                 >
-                   <option value={-1}>Todos Mês</option>
+                   <option value={-1}>Todos os Meses</option>
                    {monthNames.map((m, i) => (<option key={i} value={i}>{m}</option>))}
                 </select>
                 <select 
@@ -189,82 +196,78 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                     onChange={(e) => handleFilterChange(selectedMonth, parseInt(e.target.value))} 
                     className="bg-transparent text-zinc-200 text-sm font-medium py-1.5 px-3 border-l border-white/5 flex-1 cursor-pointer outline-none [&>option]:bg-zinc-900"
                 >
-                   <option value={-1}>Todos Ano</option>
+                   <option value={-1}>Todos os Anos</option>
                    {years.map((y) => (<option key={y} value={y}>{y}</option>))}
                 </select>
              </div>
 
              <button 
                onClick={() => setIsModalOpen(true)} 
-               className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 sm:py-2.5 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-900/20 text-sm font-bold transition-all active:scale-95 w-full sm:w-auto shrink-0"
+               className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 sm:py-2.5 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/20 text-sm font-bold transition-all active:scale-95 w-full sm:w-auto shrink-0 group"
              >
-               <Plus size={18}/> Nova Receita
+               <Plus size={18}/> Nova Receita <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform"/>
              </button>
           </div>
         </div>
 
-        {/* KPI CARDS (H-auto no Mobile) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className={cardClass}>
+        {/* =========================================================
+            KPI CARDS (Visual de Ganhos Premium)
+        ========================================================= */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            
+            {/* Card 1: Total Filtrado */}
+            <div className={`${cardClass} bg-gradient-to-br from-zinc-900/40 to-zinc-950`}>
                 <div className="w-[85%]">
-                    <p className="text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">
-                        {searchTerm ? 'Resultados da Busca' : 'Total de Receitas'}
-                    </p>
-                    <h3 className="text-2xl md:text-3xl font-bold text-white tracking-tight">{formatCurrency(currentTableTotal)}</h3>
+                    <p className="text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">{searchTerm ? 'Resultados Filtrados' : 'Total no Período'}</p>
+                    <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight">{formatCurrency(currentTableTotal)}</h3>
                 </div>
-                <div className={iconBadgeClass}><TrendingUp size={18} strokeWidth={2} /></div>
+                <div className={`${iconBadgeClass} text-emerald-400 bg-emerald-500/5`}><TrendingUp size={18} strokeWidth={2} /></div>
                 <div className="mt-4 sm:mt-auto">
-                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-md">
-                        Mês Corrente
-                    </span>
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md shadow-sm">Filtrado</span>
                 </div>
             </div>
 
+            {/* Card 2: Fluxo Acumulado */}
             <div className={cardClass}>
                 <div className="w-[85%]">
-                    <p className="text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">
-                        Fluxo Financeiro
-                    </p>
+                    <p className="text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">Acumulado do Ano</p>
                     <h3 className="text-2xl md:text-3xl font-bold text-white tracking-tight">{formatCurrency(kpiData.totalYear)}</h3>
                 </div>
-                <div className="absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-zinc-400">
-                    <Wallet size={18}/>
-                </div>
+                <div className={`${iconBadgeClass} text-zinc-400`}><Wallet size={18}/></div>
                 <div className="mt-4 sm:mt-auto">
-                    <span className="text-[10px] text-zinc-400 font-medium bg-white/5 border border-white/5 px-2 py-1 rounded-md">
-                        Acumulado ({selectedYear === -1 ? new Date().getFullYear() : selectedYear})
-                    </span>
+                    <span className="text-[10px] text-zinc-400 font-medium bg-white/5 border border-white/5 px-2 py-0.5 rounded-md">Acumulado {selectedYear === -1 ? new Date().getFullYear() : selectedYear}</span>
                 </div>
             </div>
 
+            {/* Card 3: Média Mensal */}
             <div className={cardClass}>
                 <div className="w-[85%]">
-                    <p className="text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">Média Mensal</p>
+                    <p className="text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">Média de Entradas</p>
                     <h3 className="text-2xl md:text-3xl font-bold text-white tracking-tight">{formatCurrency(kpiData.monthlyAverage)}</h3>
                 </div>
-                <div className="absolute top-5 right-5 w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-indigo-400">
-                    <DollarSign size={18}/>
-                </div>
+                <div className={`${iconBadgeClass} text-indigo-400`}><DollarSign size={18}/></div>
                 <div className="mt-4 sm:mt-auto">
-                    <span className="text-[10px] text-zinc-400 font-medium bg-white/5 border border-white/5 px-2 py-1 rounded-md">Estimativa anual</span>
+                    <span className="text-[10px] text-zinc-400 font-medium bg-white/5 border border-white/5 px-2 py-0.5 rounded-md">Estimativa mensal</span>
                 </div>
             </div>
         </div>
 
-        {/* TABELA DE DADOS E FILTROS */}
+        {/* =========================================================
+            TABELA DE DADOS E FILTROS
+        ========================================================= */}
         <div className="space-y-4">
             
-            {/* Header Lista + Busca para Mobile */}
+            {/* Header Lista + Busca */}
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-4">
-                    <h3 className="text-base font-bold text-white">Movimentações</h3>
+                    <h3 className="text-base font-bold text-white tracking-tight">Histórico de Recebimentos</h3>
                     
                     {selectedIds.length > 0 && (
                         <button 
                             onClick={handleDeleteSelected}
                             className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-md"
                         >
-                            <Trash2 size={14} /> Excluir ({selectedIds.length})
+                            <Trash2 size={14} /> Excluir em Massa ({selectedIds.length})
                         </button>
                     )}
                 </div>
@@ -275,77 +278,82 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                         type="text" 
                         value={searchTerm} 
                         onChange={(e) => setSearchTerm(e.target.value)} 
-                        placeholder="Buscar receitas..." 
-                        className="w-full rounded-lg border border-white/10 bg-zinc-900/80 py-2.5 pl-9 pr-3 text-xs font-medium text-white focus:border-emerald-500 outline-none placeholder:text-zinc-600 transition-all"
+                        placeholder="Buscar receitas por nome..." 
+                        className="w-full rounded-lg border border-white/10 bg-zinc-900/80 py-2.5 pl-9 pr-3 text-xs font-medium text-white focus:border-emerald-500 outline-none placeholder:text-zinc-600 transition-all shadow-sm"
                     />
                 </div>
             </div>
 
-            {/* CONTÊINER HÍBRIDO (Cards no Mobile, Tabela no Desktop) */}
-            <div className="card md:overflow-hidden rounded-xl md:border border-white/5 bg-transparent md:bg-zinc-950/50 p-0 flex flex-col max-h-none md:max-h-[580px]">
+            {/* CONTÊINER HÍBRIDO (Cards Premium no Mobile, Extrato Tabular no Desktop) */}
+            <div className="card md:overflow-hidden rounded-2xl md:border border-white/5 bg-transparent md:bg-zinc-950/40 p-0 flex flex-col max-h-none md:max-h-[580px] shadow-2xl">
                 
-                {/* 📱 VERSÃO MOBILE: LISTA DE CARDS (Oculto em 'md') */}
+                {/* 📱 INTERFACE MOBILE: SLEEK TIMELINE CARDS */}
                 <div className="block md:hidden space-y-3 p-1">
-                    {/* Botão Selecionar Todos - Mobile */}
                     {filteredIncomes.length > 0 && (
-                        <div className="flex items-center gap-3 px-2 mb-4">
-                           <button onClick={handleSelectAll} className="flex items-center gap-2 text-xs font-bold text-zinc-400">
+                        <div className="flex items-center gap-3 px-2 mb-3">
+                           <button onClick={handleSelectAll} className="flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors">
                                {selectedIds.length === filteredIncomes.length ? <SquareCheck size={18} className="text-emerald-500" /> : <Square size={18} />}
-                               Selecionar Tudo
+                               Selecionar Todos da Lista
                            </button>
                         </div>
                     )}
 
                     {filteredIncomes.length === 0 ? (
-                        <div className="text-center text-zinc-500 py-10 text-sm bg-zinc-900/30 rounded-xl border border-white/5">Nenhuma receita encontrada.</div>
+                        <div className="text-center text-zinc-500 p-12 text-sm bg-zinc-900/20 rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-2">
+                           <AlertCircle size={24} className="opacity-40 text-zinc-400" />
+                           Nenhuma receita encontrada.
+                        </div>
                     ) : (
-                        filteredIncomes.map((inc) => {
+                        // CORREÇÃO 4: Tipagem explícita adicionada ao inc
+                        filteredIncomes.map((inc: Income) => {
                             const isSelected = selectedIds.includes(inc.id)
 
                             return (
-                                <div key={inc.id} className={`p-4 rounded-xl border transition-colors ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-zinc-900/60 border-white/5'}`}>
+                                <div key={inc.id} className={`p-4 rounded-xl border transition-all duration-300 flex flex-col gap-4 relative overflow-hidden ${isSelected ? 'bg-emerald-600/5 border-emerald-500/30' : 'bg-zinc-900/30 border-white/5'}`}>
                                    
+                                   {/* Linha Lateral Esmeralda para representar ganhos */}
+                                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 opacity-70" />
+
                                    {/* Edição Inline Mobile */}
                                    {editingId === inc.id ? (
                                        <div className="space-y-3 animate-in fade-in duration-200">
                                            <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Editando: {inc.description}</div>
-                                           <input type="date" value={editValues.date} onChange={(e) => setEditValues({...editValues, date: e.target.value})} className="bg-[#18181b] text-white p-3 rounded-lg w-full text-sm font-medium border border-white/10 outline-none focus:border-emerald-500"/>
-                                           <input type="number" step="0.01" value={editValues.amount} onChange={(e) => setEditValues({...editValues, amount: e.target.value})} placeholder="Valor R$" className="bg-[#18181b] text-white p-3 rounded-lg w-full text-sm font-bold border border-white/10 outline-none focus:border-emerald-500"/>
+                                           <input type="date" value={editValues.date} onChange={(e) => setEditValues({...editValues, date: e.target.value})} className="bg-zinc-950 text-white p-3 rounded-xl w-full text-sm font-medium border border-white/10 outline-none focus:border-emerald-500"/>
+                                           <input type="number" step="0.01" value={editValues.amount} onChange={(e) => setEditValues({...editValues, amount: e.target.value})} placeholder="Valor R$" className="bg-zinc-950 text-white p-3 rounded-xl w-full text-sm font-bold border border-white/10 outline-none focus:border-emerald-500"/>
                                            
                                            <div className="flex justify-end gap-3 pt-2">
-                                               <button onClick={() => setEditingId(null)} className="px-5 py-2.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white bg-white/5 transition-colors">Cancelar</button>
-                                               <button onClick={() => handleSaveEdit(inc.id)} className="px-5 py-2.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"><Save size={14}/> Salvar</button>
+                                               <button type="button" onClick={() => setEditingId(null)} className="px-4 py-2 rounded-lg text-xs font-bold text-zinc-400 bg-white/5">Cancelar</button>
+                                               <button type="button" onClick={() => handleSaveEdit(inc.id)} className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-emerald-600 flex items-center gap-1.5"><Save size={12}/> Salvar</button>
                                            </div>
                                        </div>
                                    ) : (
-                                       /* Visualização Normal Mobile */
                                        <>
-                                           <div className="flex justify-between items-start mb-4">
-                                               <div className="flex items-start gap-3.5">
-                                                   <button onClick={() => handleSelectOne(inc.id)} className="mt-0.5 text-zinc-500 transition-colors">
-                                                       {isSelected ? <SquareCheck size={20} className="text-emerald-500" /> : <Square size={20} />}
+                                           <div className="flex justify-between items-start pl-2">
+                                               <div className="flex items-start gap-3">
+                                                   <button onClick={() => handleSelectOne(inc.id)} className="mt-0.5 text-zinc-500 hover:text-zinc-300">
+                                                       {isSelected ? <SquareCheck size={18} className="text-emerald-500" /> : <Square size={18} />}
                                                    </button>
                                                    <div>
-                                                       <span className="font-bold text-sm tracking-tight flex items-center gap-1.5 text-zinc-200">
+                                                       <span className="font-bold text-sm tracking-tight text-zinc-200">
                                                            {inc.description}
                                                        </span>
-                                                       <p className="text-xs text-zinc-500 font-medium mt-1">{formatDate(inc.date)}</p>
+                                                       <p className="text-[11px] text-zinc-500 font-semibold mt-0.5">{formatDate(inc.date)}</p>
                                                    </div>
                                                </div>
                                                <div className="text-right pl-2">
-                                                   <span className="font-bold text-sm tracking-tight text-emerald-400">
+                                                   <span className="font-bold text-base tracking-tight text-emerald-400">
                                                        + {formatCurrency(inc.amount)}
                                                    </span>
                                                </div>
                                            </div>
 
-                                           <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                                               <span className={`${pillBaseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`}>
-                                                   Receita
+                                           <div className="flex items-center justify-between pt-3 border-t border-white/5 pl-2">
+                                               <span className={`${pillBaseClass} bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.02)]`}>
+                                                   <CheckCircle2 size={10} className="mr-1"/> Recebido
                                                </span>
-                                               <div className="flex items-center gap-4">
-                                                   <button onClick={()=>handleStartEdit(inc)} className="text-zinc-500 hover:text-white p-1 transition-colors"><Edit2 size={16}/></button>
-                                                   <button onClick={()=>handleDelete(inc.id)} className="text-zinc-500 hover:text-rose-400 p-1 transition-colors"><Trash2 size={16}/></button>
+                                               <div className="flex items-center gap-3">
+                                                   <button onClick={()=>handleStartEdit(inc)} className="text-zinc-500 hover:text-white p-1.5 rounded-lg bg-white/5"><Edit2 size={14}/></button>
+                                                   <button onClick={()=>handleDelete(inc.id)} className="text-zinc-500 hover:text-rose-400 p-1.5 rounded-lg bg-white/5"><Trash2 size={14}/></button>
                                                </div>
                                            </div>
                                        </>
@@ -356,10 +364,10 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                     )}
                 </div>
 
-                {/* 💻 VERSÃO DESKTOP: TABELA (Oculto em 'sm/mobile') */}
+                {/* 💻 INTERFACE DESKTOP: CLEAN BANKING ROW DESIGN */}
                 <div className="hidden md:block overflow-y-auto flex-1 custom-scrollbar">
                     <table className="min-w-full divide-y divide-white/5">
-                        <thead className="bg-zinc-900/90 sticky top-0 z-10 backdrop-blur-md">
+                        <thead className="bg-zinc-900/80 sticky top-0 z-10 backdrop-blur-md border-b border-white/5">
                             <tr>
                                 <th className="px-6 py-4 w-10">
                                     <button onClick={handleSelectAll} className="text-zinc-500 hover:text-white transition-colors">
@@ -370,17 +378,18 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                                         )}
                                     </button>
                                 </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Data</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Descrição / Categoria</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Valor</th>
+                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Data do Lançamento</th>
+                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Descrição / Origem</th>
+                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Valor Monetário</th>
                                 <th className="px-6 py-4 text-right text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {filteredIncomes.length === 0 ? (
-                                <tr><td colSpan={5} className="p-16 text-center text-zinc-500 text-sm">Nenhum lançamento encontrado.</td></tr>
+                                <tr><td colSpan={5} className="p-16 text-center text-zinc-500 text-sm font-medium">Nenhum recebimento processado neste período.</td></tr>
                             ) : (
-                                filteredIncomes.map((inc) => {
+                                // CORREÇÃO 5: Tipagem explícita adicionada ao inc
+                                filteredIncomes.map((inc: Income) => {
                                     const isSelected = selectedIds.includes(inc.id)
                                     return (
                                         <tr key={inc.id} className={`transition-all group ${isSelected ? 'bg-emerald-500/10' : 'hover:bg-white/5'}`}>
@@ -390,22 +399,22 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                                                 </button>
                                             </td>
 
-                                            <td className="px-6 py-3.5 text-xs text-zinc-300 font-medium">
+                                            <td className="px-6 py-3.5 text-xs text-zinc-400 font-semibold">
                                                 {editingId === inc.id ? (
-                                                    <input type="date" value={editValues.date} onChange={(e) => setEditValues({...editValues, date: e.target.value})} className="bg-zinc-800 border border-white/10 text-white p-1.5 rounded-md w-[130px] outline-none focus:border-emerald-500"/>
+                                                    <input type="date" value={editValues.date} onChange={(e) => setEditValues({...editValues, date: e.target.value})} className="bg-zinc-800 border border-white/10 text-white p-1.5 rounded-md w-[140px] outline-none focus:border-emerald-500 text-xs font-medium"/>
                                                 ) : (
                                                     formatDate(inc.date)
                                                 )}
                                             </td>
                                             <td className="px-6 py-3.5 text-xs text-white">
-                                                <span className="inline-flex items-center gap-2 font-medium">
+                                                <span className="inline-flex items-center gap-2.5 font-semibold">
                                                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
                                                     {inc.description}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-3.5 text-sm font-bold tracking-tight text-emerald-400">
                                                 {editingId === inc.id ? (
-                                                    <input type="number" step="0.01" value={editValues.amount} onChange={(e) => setEditValues({...editValues, amount: e.target.value})} className="w-24 bg-zinc-800 border border-white/10 text-white p-1.5 rounded-md font-bold outline-none focus:border-emerald-500"/>
+                                                    <input type="number" step="0.01" value={editValues.amount} onChange={(e) => setEditValues({...editValues, amount: e.target.value})} className="w-24 bg-zinc-800 border border-white/10 text-white p-1.5 rounded-md font-bold outline-none focus:border-indigo-500 text-xs"/>
                                                 ) : (
                                                     `+ ${formatCurrency(inc.amount)}`
                                                 )}
@@ -439,35 +448,39 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
             </div>
         </div>
 
-        {/* FOOTER BAR */}
-        <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/90 backdrop-blur-md border-t border-white/10 p-3.5 md:pl-[260px] z-30">
-           <div className="mx-auto flex items-center justify-between text-xs font-medium text-zinc-400 px-2 sm:px-6">
-              <div className="flex items-center gap-2">
-                <ListFilter size={14} className="text-emerald-400" />
-                <span>Exibindo <strong className="text-white">{filteredIncomes.length}</strong> Lançamentos</span>
+        {/* =========================================================
+            BARRA DE CONTEXTO DO RODAPÉ (Floating Premium)
+        ========================================================= */}
+        <div className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur-md border-t border-white/10 p-4 md:pl-[260px] z-30 shadow-[0_-10px_25px_rgba(0,0,0,0.5)]">
+           <div className="mx-auto flex items-center justify-between text-xs font-semibold text-zinc-400 px-2 sm:px-6">
+              <div className="flex items-center gap-2.5">
+                <ListFilter size={14} className="text-emerald-400 animate-pulse" />
+                <span>Extrato ativo: <strong className="text-white">{filteredIncomes.length}</strong> recebimentos listados</span>
               </div>
-              <div className="hidden sm:block">
-                 {selectedYear === -1 ? 'Todos os Períodos consolidados' : `Período ativo: ${selectedYear}`}
+              <div className="hidden sm:block text-zinc-500">
+                 {selectedYear === -1 ? 'Todos os períodos consolidados' : `Exercício fiscal: ${selectedYear}`}
               </div>
            </div>
         </div>
 
-        {/* MODAL DE NOVA RECEITA */}
+        {/* =========================================================
+            MODAL DE NOVA RECEITA
+        ========================================================= */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-            <div className="w-full max-w-md bg-[#18181b] rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/10 animate-in zoom-in-95">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="w-full max-w-md bg-[#18181b] rounded-3xl shadow-2xl p-6 sm:p-8 border border-white/10 animate-in zoom-in-95 duration-200">
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-xl font-bold text-white flex items-center gap-3">
                   <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20"><DollarSign size={20}/></div>
                   Nova Receita
                 </h2>
-                <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors bg-white/5 p-2 rounded-lg hover:bg-white/10"><X size={20} /></button>
+                <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors bg-white/5 p-2 rounded-xl hover:bg-white/10"><X size={20} /></button>
               </div>
 
               <form onSubmit={handleSave} className="space-y-6">
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-400 mb-2 uppercase tracking-wider">Descrição / Origem</label>
-                  <input autoFocus required type="text" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="Ex: Salário, Freelance, Pix..." className="w-full rounded-xl border border-white/10 bg-zinc-900/50 p-3.5 text-white focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-zinc-600 text-sm transition-colors"/>
+                  <input autoFocus required type="text" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="Ex: Salário, Freelance, Rendimentos..." className="w-full rounded-xl border border-white/10 bg-zinc-900/50 p-3.5 text-white focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-zinc-600 text-sm transition-colors"/>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -475,13 +488,13 @@ export default function IncomesClient({ initialIncomes, kpiData, selectedMonth, 
                     <input required type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} placeholder="0.00" className="w-full rounded-xl border border-white/10 bg-zinc-900/50 p-3.5 text-white focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-emerald-400 text-sm transition-colors"/>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-400 mb-2 uppercase tracking-wider">Data da Receita</label>
+                    <label className="block text-[11px] font-bold text-zinc-400 mb-2 uppercase tracking-wider">Data do Recebimento</label>
                     <input required type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="w-full rounded-xl border border-white/10 bg-zinc-900/50 p-3.5 text-white focus:ring-1 focus:ring-emerald-500 outline-none text-sm transition-colors"/>
                   </div>
                 </div>
                 <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 border border-white/10 text-zinc-300 rounded-xl hover:bg-white/5 font-bold transition-colors text-sm">Cancelar</button>
-                  <button type="submit" disabled={isLoadingSave} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 font-bold shadow-lg shadow-emerald-900/20 flex justify-center items-center gap-2 transition-all active:scale-95 text-sm">{isLoadingSave ? 'Salvando...' : 'Salvar Receita'}</button>
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3.5 border border-white/10 text-zinc-400 hover:text-white rounded-xl hover:bg-white/5 font-bold transition-colors text-sm">Cancelar</button>
+                  <button type="submit" disabled={isLoadingSave} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 font-bold shadow-lg shadow-emerald-900/20 flex justify-center items-center gap-2 transition-all active:scale-95 text-sm">{isLoadingSave ? 'Salvando...' : 'Salvar Receita'}</button>
                 </div>
               </form>
             </div>
