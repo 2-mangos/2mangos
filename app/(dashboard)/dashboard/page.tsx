@@ -207,7 +207,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   return (
     <div className="min-h-screen p-8 pb-32">
-      <div className="mx-auto max-w-7xl">
+      <div className="min-h-screen p-8 pb-32">
         <DashboardClient 
           data={dashboardData} 
           userProfile={{ name: displayName, plan: userData?.plano || 'free' }}
