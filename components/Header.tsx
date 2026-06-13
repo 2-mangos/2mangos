@@ -63,7 +63,7 @@ export default function Header() {
 
   return (
     <header className="h-16 bg-[#09090b]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-end px-4 pl-16 md:px-8 sticky top-0 z-30 w-full">
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-6 md:mr-9 lg:mr-16">
         <div className="relative" ref={menuRef}>
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
