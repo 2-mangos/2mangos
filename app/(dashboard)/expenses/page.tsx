@@ -69,7 +69,8 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="min-h-screen p-8 pb-32">
-      <div className="mx-auto max-w-6xl">
+      {/* Aqui foi alterado de max-w-6xl para w-full max-w-screen-2xl para ocupar melhor a tela */}
+      <div className="mx-auto w-full max-w-[1600px]">
         <ExpensesClient 
             initialExpenses={expenses}
             kpiData={{ totalYear: kpiTotalYear, monthlyAverage: kpiMonthlyAverage }}

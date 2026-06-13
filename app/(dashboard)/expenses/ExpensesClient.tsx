@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { 
   MoreVertical, Edit2, Trash2, Save, X, Search, CreditCard, 
   Plus, Calendar, DollarSign, TrendingDown, Wallet, ListFilter, 
-  SquareCheck, Square, Repeat, ArrowRight, ArrowUpRight, AlertCircle, CheckCircle2, Clock
+  SquareCheck, Square, Repeat, ArrowRight, ArrowUpRight, AlertCircle, CheckCircle2, Clock, PieChart
 } from 'lucide-react'
 import NewExpenseModal from '../../../components/NewExpenseModal'
 import CreditCardModal from '../../../components/CreditCardModal'
@@ -307,7 +307,7 @@ export default function ExpensesClient({
         {/* =========================================================
             KPI CARDS (Visual de Ganhos/Perdas Premium)
         ========================================================= */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             
             {/* Card 1: Total Filtrado */}
             <div className={`${cardClass} bg-gradient-to-br from-zinc-900/40 to-zinc-950`}>
@@ -344,6 +344,18 @@ export default function ExpensesClient({
                     <span className="text-[10px] text-zinc-400 font-medium bg-white/5 border border-white/5 px-2 py-0.5 rounded-md">Estimativa mensal</span>
                 </div>
             </div>
+
+            {/* Card 4: Em Breve (Novo Recurso) */}
+            <div className={`${cardClass} border border-dashed border-white/10 bg-zinc-950/20 opacity-70`}>
+                <div className="w-[85%]">
+                    <p className="text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">Análise Avançada</p>
+                    <h3 className="text-xl md:text-2xl font-bold text-zinc-400 tracking-tight mt-1">Em breve</h3>
+                </div>
+                <div className={`${iconBadgeClass} text-zinc-500 bg-white/5`}><PieChart size={18} /></div>
+                <div className="mt-4 sm:mt-auto">
+                    <span className="text-[10px] text-zinc-500 font-medium bg-zinc-900/80 border border-white/5 px-2 py-0.5 rounded-md">Próxima Atualização</span>
+                </div>
+            </div>
         </div>
 
         {/* =========================================================
@@ -351,38 +363,41 @@ export default function ExpensesClient({
         ========================================================= */}
         <div className="space-y-4">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-4">
-                    <h3 className="text-base font-bold text-white tracking-tight">Histórico de Movimentações</h3>
-                    {selectedIds.length > 0 && (
-                        <button onClick={handleDeleteSelected} className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-md">
-                            <Trash2 size={14} /> Excluir em Massa ({selectedIds.length})
-                        </button>
-                    )}
-                </div>
                 
                 {/* Linha de Inputs de Filtros */}
-                <div className="grid grid-cols-2 md:flex md:w-auto gap-3 w-full">
-                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full rounded-lg border border-white/10 bg-zinc-900/80 py-2.5 px-3 text-xs font-semibold text-zinc-300 outline-none focus:border-indigo-500 transition-colors shadow-sm">
+                <div className="grid grid-cols-2 md:flex md:flex-row gap-3 w-full lg:w-auto items-center">
+                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-40 lg:w-48 rounded-lg border border-white/10 bg-zinc-900/80 py-2.5 px-3 text-xs font-semibold text-zinc-300 outline-none focus:border-indigo-500 transition-colors shadow-sm cursor-pointer">
                         <option value="todos">Todos os Status</option>
-                        <option value="pago">Efetivados (Pagos)</option>
-                        <option value="pendente">Não Efetivados</option>
+                        <option value="pago">Pagos</option>
+                        <option value="pendente">Pendentes</option>
                     </select>
-                    <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full rounded-lg border border-white/10 bg-zinc-900/80 py-2.5 px-3 text-xs font-semibold text-zinc-300 outline-none focus:border-indigo-500 transition-colors shadow-sm">
+                    
+                    <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full md:w-40 lg:w-48 rounded-lg border border-white/10 bg-zinc-900/80 py-2.5 px-3 text-xs font-semibold text-zinc-300 outline-none focus:border-indigo-500 transition-colors shadow-sm cursor-pointer">
                         <option value="todos">Todos os Tipos</option>
                         <option value="variavel">Despesas Variáveis</option>
                         <option value="fixa">Despesas Recorrentes</option>
                     </select>
-                    <div className="relative col-span-2 md:col-span-1 md:w-56">
+                    
+                    <div className="relative col-span-2 md:col-span-1 w-full md:w-72 lg:w-96">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
                         <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Procurar despesa específica..." className="w-full rounded-lg border border-white/10 bg-zinc-900/80 py-2.5 pl-9 pr-3 text-xs font-medium text-white outline-none focus:border-indigo-500 transition-colors placeholder:text-zinc-600 shadow-sm"/>
                     </div>
                 </div>
+
+                {/* Ações da Tabela */}
+                <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto justify-end">
+                    {selectedIds.length > 0 && (
+                        <button onClick={handleDeleteSelected} className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white rounded-lg text-[11px] font-bold transition-all shadow-md ml-auto lg:ml-0">
+                            <Trash2 size={14} /> Excluir em Massa ({selectedIds.length})
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* CONTÊINER HÍBRIDO (Cards Premium no Mobile, Extrato Tabular Clean no Desktop) */}
+            {/* CONTÊINER HÍBRIDO */}
             <div className="card md:overflow-hidden rounded-2xl md:border border-white/5 bg-transparent md:bg-zinc-950/40 p-0 flex flex-col max-h-none md:max-h-[590px] shadow-2xl">
                 
-                {/* 📱 INTERFACE MOBILE: SLEEK TIMELINE CARDS */}
+                {/* 📱 INTERFACE MOBILE */}
                 <div className="block md:hidden space-y-3 p-1">
                     {filteredExpenses.length > 0 && (
                         <div className="flex items-center gap-3 px-2 mb-3">
@@ -408,7 +423,6 @@ export default function ExpensesClient({
                             return (
                                 <div key={expense.id} className={`p-4 rounded-xl border transition-all duration-300 flex flex-col gap-4 relative overflow-hidden ${isSelected ? 'bg-indigo-600/5 border-indigo-500/30' : 'bg-zinc-900/30 border-white/5'}`}>
                                    
-                                   {/* Linha Lateral de Categoria da Cor Escolhida */}
                                    <div className="absolute left-0 top-0 bottom-0 w-1 opacity-70" style={{ backgroundColor: badgeColor }} />
 
                                    {editingId === expense.id ? (
@@ -467,7 +481,7 @@ export default function ExpensesClient({
                     )}
                 </div>
 
-                {/* 💻 INTERFACE DESKTOP: CLEAN BANKING ROW DESIGN */}
+                {/* 💻 INTERFACE DESKTOP */}
                 <div className="hidden md:block overflow-y-auto flex-1 custom-scrollbar">
                     <table className="min-w-full divide-y divide-white/5">
                         <thead className="bg-zinc-900/80 sticky top-0 z-10 backdrop-blur-md border-b border-white/5">
@@ -479,8 +493,8 @@ export default function ExpensesClient({
                                 </th>
                                 <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Data do Lançamento</th>
                                 <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Categoria / Classificação</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Valor Monetário</th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Fluxo</th>
+                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Valor</th>
+                                <th className="px-6 py-4 text-left text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-4 text-right text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
@@ -532,7 +546,7 @@ export default function ExpensesClient({
                                                     <button onClick={() => setEditingId(null)} className="text-zinc-300 bg-zinc-700 hover:bg-zinc-600 p-1.5 rounded-md transition-colors"><X size={14}/></button>
                                                 </div>
                                             ) : (
-                                                <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex justify-end transition-opacity">
                                                     <button onClick={(e)=>{e.stopPropagation(); handleToggleMenu(expense.id)}} className="text-zinc-400 hover:text-white p-1.5 hover:bg-white/10 rounded-md transition-colors"><MoreVertical size={16}/></button>
                                                     {openMenuId === expense.id && (
                                                         <div ref={menuRef} className="absolute right-10 top-2 z-50 w-32 bg-zinc-800 shadow-xl rounded-xl border border-white/10 overflow-hidden py-1 animate-in fade-in zoom-in-95">
